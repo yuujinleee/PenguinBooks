@@ -1,3 +1,2 @@
-This project does this.
-
-![snapshot](https://github.com/user-attachments/assets/00f9046a-24aa-4c51-b105-7facddce50e7)
+Check photo below for the issue (exception needs to be handled)
+![algo](https://github.com/user-attachments/assets/f4f95910-7897-499f-9201-22e7a403b365)
