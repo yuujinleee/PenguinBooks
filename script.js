@@ -10,6 +10,7 @@ import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { RectAreaLightHelper } from "three/examples/jsm/helpers/RectAreaLightHelper.js";
 import { render } from "vue";
+import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 
 //GUI and Stats
 const gui = new GUI();
@@ -23,8 +24,7 @@ const sizes = {
   width: window.innerWidth,
   height: window.innerHeight,
 };
-const raycaster = new THREE.Raycaster();
-let INTERSECTED = null;
+
 const mouse = { x: 0, y: 0 };
 window.addEventListener("mousemove", (event) => {
   mouse.x = (event.clientX / sizes.width) * 2 - 1;
@@ -34,18 +34,27 @@ window.addEventListener("mousemove", (event) => {
 
 // Scene
 const scene = new THREE.Scene();
-
+scene.background = new THREE.Color(0xf6f6ee);
 // AxesHelper
-const axesHelper = new THREE.AxesHelper(20); //size
-axesHelper.position.y = -12;
+const axesHelper = new THREE.AxesHelper(30); //size
 scene.add(axesHelper);
 
 // Load Environment Map
-const rgbeLoader = new RGBELoader();
-rgbeLoader.load("/environmentMaps/field.hdr", (environmentMap) => {
-  environmentMap.mapping = THREE.EquirectangularReflectionMapping;
-  // scene.background = environmentMap;
-  scene.environment = environmentMap;
+// const rgbeLoader = new RGBELoader();
+// rgbeLoader.load("/environmentMaps/field.hdr", (environmentMap) => {
+//   environmentMap.mapping = THREE.EquirectangularReflectionMapping;
+//   // scene.background = environmentMap;
+//   scene.environment = environmentMap;
+// });
+new EXRLoader().load("environmentMaps/interior.exr", function (texture) {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  // exrCubeRenderTarget = pmremGenerator.fromEquirectangular(texture);
+  scene.environment = texture;
+  scene.environmentIntensity = 0.644;
+  scene.environmentRotation.y = 4.8;
+  const envFolder = gui.addFolder("Environment");
+  envFolder.add(scene, "environmentIntensity", 0, 1, 0.001).name("Intensity");
+  envFolder.add(scene.environmentRotation, "y", 4, 6.5, 0.001).name("Rotation");
 });
 
 // Load Wall Textures (to change with)
@@ -53,6 +62,7 @@ const textureLoader = new THREE.TextureLoader();
 let wallMesh = null;
 let currentTextureIndex = 0;
 const TOTAL_BOOKS = 10;
+const NUM_BOOKS = 40;
 const textureCache = [];
 
 for (let i = 0; i < TOTAL_BOOKS; i++) {
@@ -68,82 +78,7 @@ for (let i = 0; i < TOTAL_BOOKS; i++) {
 
 // Load GLTF
 const gltfLoader = new GLTFLoader();
-gltfLoader.load(
-  "/models/proj_0617.gltf",
-  (gltf) => {
-    // console.log("success");
-    gltf.scene.rotateX(-0.08);
-    scene.add(gltf.scene);
-    // console.log(gltf.scene.children);
-    gltf.scene.children[1].visible = false;
-    // console.log(gltf.scene.children);
-
-    scene.traverse(function (child) {
-      if (child.isMesh && child.name === "Wallback") {
-        wallMesh = child;
-        wallMesh.material.metalness = 1;
-        wallMesh.material.roughness = 1;
-        wallMesh.material.normalScale.set(5, 5); //Strength
-        // GUI
-        const wallFolder = gui.addFolder("Wall Material");
-        wallFolder.add(wallMesh.material, "metalness", 0, 1, 0.01);
-        wallFolder.add(wallMesh.material, "roughness", 0, 1, 0.01);
-        wallFolder
-          .add(wallMesh.material.normalScale, "x", 0, 5, 0.1)
-          .name("normal strength")
-          .onChange((v) => wallMesh.material.normalScale.set(v, v));
-      }
-      if (child.isMesh && child.name === "Wallwood") {
-        child.material.metalness = 0.8;
-        child.material.roughness = 1;
-        child.material.normalScale.set(3, 3);
-
-        const woodFolder = gui.addFolder("Wood Material");
-        woodFolder.add(child.material, "metalness", 0, 1, 0.01);
-        woodFolder.add(child.material, "roughness", 0, 1, 0.01);
-        woodFolder
-          .add(child.material.normalScale, "x", 0, 5, 0.1)
-          .name("normal strength")
-          .onChange((v) => child.material.normalScale.set(v, v));
-      }
-
-      if (child.isMesh && child.name === "WallLamp_2") {
-        child.material.emissive.set("#f0e3b2");
-        // gui.addColor({ color: "#f0e3b2" }, "color").onChange((c) => {
-        //   child.material.emissive.set(c);
-        // });
-      }
-      if (child.isMesh && child.name === "LampEmmisive") {
-        child.material.emissive.set("#f0e3b2");
-      }
-      if (child.isMesh && child.name === "LampGold") {
-        child.material.color.set("#fbbf6a");
-        gui
-          .addColor(
-            { color: `#${child.material.color.getHexString()}` },
-            "color"
-          )
-          .name("Gold color")
-          .onChange((c) => {
-            child.material.color.set(c);
-          });
-      }
-    });
-  },
-  (progress) => {
-    console.log("progress");
-    console.log(progress);
-  },
-  (error) => {
-    console.log("error");
-    console.log(error);
-  }
-);
-
 let mixer = null;
-let BOOK_START_POS = { x: -8.86, y: -6.6, z: -0.2 };
-
-let bookSideMesh = null;
 const bookFrontCache = [];
 const bookSideCache = [];
 
@@ -162,28 +97,75 @@ for (let i = 0; i < TOTAL_BOOKS; i++) {
   );
 }
 
+let objectsToTest = [];
+
+let bookCoverMat = null;
 gltfLoader.load(
-  "/models/book2.gltf",
+  "/models/book.gltf",
   (gltf) => {
     // console.log("success");
-    // gltf.scene.children[0].scale.y = 1.7;
     const baseBook = gltf.scene;
-    baseBook.rotateX(Math.PI / 2 - 0.3);
-    baseBook.scale.z = 0.9;
-    // baseBook.rotateZ(-0.1);
-
-    // baseBook.rotateZ(-Math.PI / 2);
-    baseBook.position.set(-8.86, -6.6, -0.2);
+    baseBook.rotateX(Math.PI / 2);
+    baseBook.rotateZ(-Math.PI / 2);
+    baseBook.position.set(-7, 0, 0);
 
     baseBook.traverse(function (child) {
       if (child.name === "pageFront") child.visible = false;
       if (child.name === "pageBack") child.visible = false;
-    });
-    // scene.add(baseBook);
+      if (child.isMesh === true) console.log(child.name);
+      if (child.isMesh && child.name === "bookCover_1") {
+        child.material.metalness = 0.36;
+        child.material.roughness = 0.61;
+        child.material.normalScale.set(2.2, 2.2);
+      }
+      if (child.isMesh && child.name === "bookCover_3") {
+        child.material.metalness = 0.36;
+        child.material.roughness = 0.61;
+        child.material.normalScale.set(2.2, 2.2);
 
-    for (let i = 0; i < 4; i++) {
+        //GUI
+        bookCoverMat = child.material;
+        const bookFolder = gui.addFolder("Book");
+        bookFolder.add(bookCoverMat, "metalness", 0, 1, 0.001).onChange((v) => {
+          scene.traverse(function (child) {
+            if (child.isMesh && child.name === "bookCover_1") {
+              child.material.metalness = v;
+            }
+            if (child.isMesh && child.name === "bookCover_3") {
+              child.material.metalness = v;
+            }
+          });
+        });
+        bookFolder.add(bookCoverMat, "roughness", 0, 1, 0.001).onChange((v) => {
+          scene.traverse(function (child) {
+            if (child.isMesh && child.name === "bookCover_1") {
+              child.material.roughness = v;
+            }
+            if (child.isMesh && child.name === "bookCover_3") {
+              child.material.roughness = v;
+            }
+          });
+        });
+        bookFolder
+          .add(bookCoverMat.normalScale, "x", 0, 8, 0.01)
+          .name("normal strength")
+          .onChange((v) => {
+            scene.traverse(function (child) {
+              if (child.isMesh && child.name === "bookCover_1") {
+                child.material.normalScale.set(v, v);
+              }
+              if (child.isMesh && child.name === "bookCover_3") {
+                child.material.normalScale.set(v, v);
+              }
+            });
+          });
+      }
+    });
+    scene.add(baseBook);
+
+    for (let i = 0; i < NUM_BOOKS; i++) {
       const book = SkeletonUtils.clone(baseBook);
-      book.position.set(-8.4 + 4.2 * i, -7.4, -3);
+      book.position.set(-3 + 1.2 * i, 0, 0);
       book.traverse((child) => {
         if (child.isMesh) {
           if (child.isMesh && child.name === "bookCover_1") {
@@ -191,6 +173,7 @@ gltfLoader.load(
             child.material = child.material.clone();
             child.material.map = bookSideCache[i % TOTAL_BOOKS];
             child.material.needsUpdate = true;
+            objectsToTest.push(child);
           }
           if (child.isMesh && child.name === "bookCover_3") {
             //bookFrontMat
@@ -201,61 +184,11 @@ gltfLoader.load(
         }
       });
       scene.add(book);
-    }
-    for (let i = 0; i < 4; i++) {
-      const book = SkeletonUtils.clone(baseBook);
-      book.position.set(-8.4 + 4.2 * i, -14.9, -1.4);
-      book.traverse((child) => {
-        if (child.isMesh) {
-          if (child.isMesh && child.name === "bookCover_1") {
-            //bookSideMat
-            child.material = child.material.clone();
-            child.material.map = bookSideCache[(i + 4) % TOTAL_BOOKS];
-            child.material.needsUpdate = true;
-          }
-          if (child.isMesh && child.name === "bookCover_3") {
-            //bookFrontMat
-            child.material = child.material.clone();
-            child.material.map = bookFrontCache[(i + 4) % TOTAL_BOOKS];
-            child.material.needsUpdate = true;
-          }
-        }
-      });
-      scene.add(book);
+      // console.log(objectsToTest);
     }
 
-    // const bookCoverGroup =
+    //
 
-    // GUI
-    const bookFolder = gui.addFolder("Book");
-    // bookFolder.add(baseBook.position, "x", -12, -3, 0.01);
-    // bookFolder.add(baseBook.position, "y", -20, -12, 0.01);
-    // bookFolder.add(gltf.scene.position, "z", -2, 4, 0.01);
-    // bookFolder.add(baseBook.scale, "y", 1, 3, 0.1).name("thickness");
-
-    // console.log(baseBook.children); // 1,1,1
-
-    // bookFolder
-    //   .add(baseBook.material, "metalness", 0, 1, 0.01)
-    //   .onChange((v) => {
-    //     scene.traverse(function (child) {
-    //       if (child.isMesh && child.name === "bookCover_3") {
-    //     child.material.metalness = v;}
-    //   });
-    // bookFolder
-    //   .add(child.material, "roughness", 0, 1, 0.01)
-    //   .onChange((v) => {
-    //     bookSideMesh.material.roughness = v;
-    //   });
-    // bookFolder
-    //   .add(child.material.normalScale, "x", 0, 8, 0.1)
-    //   .name("normal strength")
-    //   .onChange((v) => {
-    //     child.material.normalScale.set(v, v);
-    //     bookSideMesh.material.normalScale.set(v, v);
-    //   });
-    //   }
-    // });
     // BookOpenAnimation
     mixer = new THREE.AnimationMixer(gltf.scene);
     const action = mixer.clipAction(gltf.animations[0]);
@@ -272,65 +205,52 @@ gltfLoader.load(
 );
 
 // Change Wall Texture on Event
-function wallChangeEvent(event) {
-  // console.log(wallMesh);
-  if (!wallMesh) return;
-  currentTextureIndex = (currentTextureIndex + 1) % (TOTAL_BOOKS + 1);
-  wallMesh.material.map = textureCache[currentTextureIndex];
-  wallMesh.material.needsUpdate = true;
-  console.log(`Switched to: wall${currentTextureIndex}.png`);
-}
-window.addEventListener("keydown", wallChangeEvent);
+// function wallChangeEvent(event) {
+//   // console.log(wallMesh);
+//   if (!wallMesh) return;
+//   currentTextureIndex = (currentTextureIndex + 1) % (TOTAL_BOOKS + 1);
+//   wallMesh.material.map = textureCache[currentTextureIndex];
+//   wallMesh.material.needsUpdate = true;
+//   console.log(`Switched to: wall${currentTextureIndex}.png`);
+// }
+// window.addEventListener("keydown", wallChangeEvent);
+
+addEventListener("wheel", (event) => {
+  // console.log(event.deltaX, event.deltaY);
+  camera.position.x += event.deltaY * 0.01;
+});
 
 // Camera
-const camera = new THREE.PerspectiveCamera(50, sizes.width / sizes.height);
-camera.position.z = 37.7;
-camera.position.y = -8.4;
+const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height);
+camera.position.z = 11;
+camera.position.y = 1;
+
+// const controls = new OrbitControls(camera, canvas);
+// controls.target.y = 1;
+// controls.enableDamping = true;
+
+// gui.add(camera.position, "y", 0, 1, 0.01).onChange((v) => {
+//   controls.target.y = v;
+// });
+// camera.rotateY(Math.PI / 2);
 // camera.lookAt(new THREE.Vector3(0, 0, 0));
 // camera.lookAt(mesh.position);
 scene.add(camera);
+// gui.add(camera.position, "z", 0, 30, 0.5);
 
 // Lights
+// const ambLight = new THREE.AmbientLight(0x404040, 100); // soft white light
+// scene.add(ambLight);
 // color , intensity, width , height
-const rectAreaLight = new THREE.RectAreaLight(0xffc900, 6, 12, 12);
-rectAreaLight.position.set(0, -3, 30);
-rectAreaLight.lookAt(new THREE.Vector3(0, -10, 30));
+// const rectAreaLight = new THREE.RectAreaLight(0xffc900, 6, 12, 12);
+// rectAreaLight.position.set(0, -3, 30);
+// rectAreaLight.lookAt(new THREE.Vector3(0, -10, 30));
 // rectAreaLight.rotation.x = -0.4;
 // scene.add(rectAreaLight);
-const rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
+// const rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
 // scene.add(rectAreaLightHelper);
 
-//Color, Intensity, Distancnpme, decay
-const pointLight1 = new THREE.PointLight(0xff9000, 15, 0, 0.5);
-pointLight1.position.set(9.6, -9.4, 2.6);
-pointLight1.scale.setY(8);
-scene.add(pointLight1);
-const pointLightHelper1 = new THREE.PointLightHelper(pointLight1, 0.8);
-scene.add(pointLightHelper1);
-
-const pointLight2 = new THREE.PointLight(0xff9000, 15, 0, 0.5);
-pointLight2.position.set(-9.6, -9.4, 2.6);
-pointLight2.scale.setY(8);
-scene.add(pointLight2);
-const pointLightHelper2 = new THREE.PointLightHelper(pointLight2, 0.8);
-scene.add(pointLightHelper2);
-
-const pointFolder = gui.addFolder("Point Lights (Lamp)");
-pointFolder
-  .add(pointLight1.position, "y", -10, 4, 0.1)
-  .onChange((val) => (pointLight2.position.y = val));
-pointFolder.add(pointLight1, "intensity", 5, 25, 1).onChange((val) => {
-  pointLight2.intensity = val;
-});
-pointFolder.add(pointLight1, "decay", 0, 2, 0.05).onChange((val) => {
-  pointLight2.decay = val;
-});
-pointFolder
-  .addColor({ color: `#${pointLight1.color.getHexString()}` }, "color")
-  .onChange((c) => {
-    pointLight1.color.set(c);
-    pointLight2.color.set(c);
-  });
+//Color, Intensity, Distance, decay
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({
@@ -339,17 +259,19 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setSize(sizes.width, sizes.height);
 
-const controls = new OrbitControls(camera, canvas);
-controls.target.y = -12;
-controls.enableDamping = true;
-
 // Animation
 const clock = new THREE.Clock();
 let previousTime = 0;
 
+// Raycaster
+const raycaster = new THREE.Raycaster();
+let currentIntersect = null;
+
 // ---- GSAP
 // gsap.to(mesh.position, { duration: 1, delay: 1, x: 2 });
-// gsap.to(mesh.position, { duration: 1, delay: 2, x: 0 });
+let prevIndex = null;
+const BOOK_SHIFT_DURATION = 0.7;
+const BOOK_SHIFT_OFFSET_X = 4;
 
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
@@ -363,31 +285,114 @@ const tick = () => {
 
   // Raycaster
   raycaster.setFromCamera(mouse, camera);
-  // const objectsToTest = [object1, object2, object3];
-  // const intersects = raycaster.intersectObjects(objectsToTest);
+  const intersects = raycaster.intersectObjects(objectsToTest);
 
-  // for (const intersect of intersects) {
-  //   intersect.object.material.color.set("#0000ff");
-  // }
+  if (intersects.length) {
+    if (!currentIntersect) {
+      console.log("mouse enter");
+      // console.log(intersects[0].object.parent.parent);
+
+      // Target book - Front cover animation (transform position and rotation)
+      let targetBook = intersects[0].object.parent.parent;
+
+      gsap.to(targetBook.rotation, {
+        duration: BOOK_SHIFT_DURATION,
+        z: 0,
+        onStart: function () {
+          // gsap.to(targetBook.position, {
+          //   duration: BOOK_SHIFT_DURATION,
+          //   x: targetBook.position + 1,
+          // });
+          console.log("start");
+          raycaster.layers.disableAll();
+          // Reset last target's transform to original (position and rotation)
+          for (const object of objectsToTest) {
+            if (!intersects.find((intersect) => intersect.object === object)) {
+              object.material.color.set("#ffffff");
+              gsap.to(object.parent.parent.rotation, {
+                duration: BOOK_SHIFT_DURATION,
+                z: -Math.PI / 2,
+              });
+            }
+          }
+        },
+        onComplete: function () {
+          console.log("finish");
+          raycaster.layers.enableAll();
+        },
+      });
+
+      // Shift books (right of the target) to the right
+      let newIndex = objectsToTest.indexOf(intersects[0].object);
+      if (!prevIndex) {
+        // No previous target exists
+        for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
+          gsap.to(objectsToTest[i].parent.parent.position, {
+            duration: BOOK_SHIFT_DURATION,
+            x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_OFFSET_X,
+          });
+        }
+      } else {
+        // New target is from left-hand side of last target
+        if (newIndex < prevIndex) {
+          for (let i = newIndex + 1; i < prevIndex + 1; i++) {
+            gsap.to(objectsToTest[i].parent.parent.position, {
+              duration: BOOK_SHIFT_DURATION,
+              x:
+                objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_OFFSET_X,
+            });
+          }
+        }
+        // New target is from right-hand side of last target
+        if (newIndex > prevIndex) {
+          if (prevIndex === 0) console.log("elo elo");
+          for (let i = prevIndex + 1; i < newIndex + 1; i++) {
+            gsap.to(objectsToTest[i].parent.parent.position, {
+              duration: BOOK_SHIFT_DURATION,
+              x:
+                objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_OFFSET_X,
+            });
+          }
+        }
+      }
+      prevIndex = newIndex;
+    }
+    currentIntersect = intersects[0];
+  } else {
+    if (currentIntersect) {
+      // console.log("mouse leave");
+    }
+    currentIntersect = null;
+  }
+
+  for (const intersect of intersects) {
+    // console.log(intersect.object);
+    intersect.object.material.color.set("#ff0000");
+    // intersect.object
+  }
 
   // for (const object of objectsToTest) {
   //   if (!intersects.find((intersect) => intersect.object === object)) {
-  //     object.material.color.set("#ff0000");
+  //     object.material.color.set("#ffffff");
+  //     // gsap.to(object.parent.parent.rotation, {
+  //     //   duration: 1,
+  //     //   z: -Math.PI / 2,
+  //     // });
   //   }
   // }
 
   // camera.position.y = Math.sin(elapsedTime);
-  // camera.lookAt(mesh.position);
   // camera.lookAt(new THREE.Vector3(0, -12, 0));
 
   // console.log("tick");
   // Update controls
-  controls.update();
+  // controls.update();
   // Render
   renderer.render(scene, camera);
   // JS will call it on the next frame
   window.requestAnimationFrame(tick);
   stats.update();
+  // console.log(camera.position);
 };
 tick();
 
