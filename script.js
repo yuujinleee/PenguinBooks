@@ -274,8 +274,8 @@ let prevIndex = null;
 const BOOK_SHIFT_DURATION = 0.7;
 const BOOK_SHIFT_X = 4;
 const BOOK_TARGET_OFFSET_X = 0.6;
-const BOOK_TARGET_OFFSET_Z = -0.42;
-// let lastTargetBook = null;
+// const BOOK_TARGET_OFFSET_Z = -0.42;
+const BOOK_TARGET_OFFSET_Z = -0.6;
 // GUI Buffer Test
 // objectsToTest[2]
 
@@ -294,42 +294,41 @@ const tick = () => {
   const intersects = raycaster.intersectObjects(objectsToTest);
 
   if (intersects.length) {
-    if (
-      !currentIntersect &&
-      prevIndex !== objectsToTest.indexOf(intersects[0].object)
-    ) {
+    let newIndex = objectsToTest.indexOf(intersects[0].object);
+    if (!currentIntersect && prevIndex !== newIndex) {
       console.log("mouse enter");
-      // console.log(intersects[0].object.parent.parent);
-
       // Target book Front cover animation (transform position and rotation)
-      let newIndex = objectsToTest.indexOf(intersects[0].object);
-      let targetBook = objectsToTest[newIndex].parent.parent;
-      // let targetBook = intersects[0].object.parent.parent;
-
-      console.log("newIndex", newIndex);
+      // let targetBook = objectsToTest[newIndex].parent.parent;
+      let targetBook = intersects[0].object.parent.parent;
 
       gsap.to(targetBook.position, {
         duration: BOOK_SHIFT_DURATION,
-        x: targetBook.position.x + BOOK_TARGET_OFFSET_X,
+        // x: targetBook.position.x + BOOK_TARGET_OFFSET_X,
         z: BOOK_TARGET_OFFSET_Z,
         onStart: function () {
-          console.log("A1");
+          console.log("DISABLE raycaster");
           raycaster.layers.disableAll();
         },
       });
+      for (let c of targetBook.children) {
+        gsap.to(
+          c.position,
+          {
+            duration: BOOK_SHIFT_DURATION,
+            x: BOOK_TARGET_OFFSET_X,
+          },
+          "<"
+        );
+      }
       gsap.to(
         targetBook.rotation,
         {
           duration: BOOK_SHIFT_DURATION,
           z: 0,
           onStart: function () {
-            console.log("A2");
-
             // Reset last target's transform to original (position and rotation)
             if (prevIndex !== null) {
-              console.log("prevIndex : ", prevIndex);
               let lastTargetBook = objectsToTest[prevIndex].parent.parent;
-              console.log(lastTargetBook);
               gsap.to(
                 lastTargetBook.rotation,
                 {
@@ -343,12 +342,20 @@ const tick = () => {
                 lastTargetBook.position,
                 {
                   duration: BOOK_SHIFT_DURATION,
-                  x: lastTargetBook.position.x - BOOK_TARGET_OFFSET_X,
                   z: 0,
-                  onStart: console.log("B2"),
                 },
                 "<"
               );
+              for (let c of lastTargetBook.children) {
+                gsap.to(
+                  c.position,
+                  {
+                    duration: BOOK_SHIFT_DURATION,
+                    x: 0,
+                  },
+                  "<"
+                );
+              }
             }
             if (prevIndex === null) {
               // No previous target exists
@@ -356,55 +363,47 @@ const tick = () => {
                 gsap.to(objectsToTest[i].parent.parent.position, {
                   duration: BOOK_SHIFT_DURATION,
                   x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
-                  onStart: console.log("C1"),
                 });
               }
-              // raycaster.layers.enableAll();
             } else {
               // Previous Target Exists
-
               // New target is from left-hand side of last target
               if (newIndex < prevIndex) {
                 for (let i = newIndex + 1; i < prevIndex + 1; i++) {
                   gsap.to(objectsToTest[i].parent.parent.position, {
                     duration: BOOK_SHIFT_DURATION,
                     x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
-                    onStart: console.log("C2"),
                   });
                 }
               }
               // New target is from right-hand side of last target
-              if (newIndex > prevIndex || prevIndex === 0) {
+              if (newIndex > prevIndex) {
                 for (let i = prevIndex + 1; i < newIndex + 1; i++) {
                   gsap.to(objectsToTest[i].parent.parent.position, {
                     duration: BOOK_SHIFT_DURATION,
                     x: objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_X,
-                    onStart: console.log("C3"),
                   });
                 }
               }
             }
             prevIndex = newIndex;
-            // for (const object of objectsToTest) {
-            //   if (!intersects.find((intersect) => intersect.object === object)) {
-            //     object.material.color.set("#ffffff");
-            //     gsap.to(object.parent.parent.rotation, {
-            //       duration: BOOK_SHIFT_DURATION,
-            //       z: -Math.PI / 2,
-            //     });
-            //   }
-            // }
+            for (const object of objectsToTest) {
+              if (
+                !intersects.find((intersect) => intersect.object === object)
+              ) {
+                object.material.color.set("#ffffff");
+              }
+            }
             // lastTargetBook = targetBook;
           },
           onComplete: function () {
-            console.log("FINISH");
+            console.log("ENABLE raycaster");
             raycaster.layers.enableAll();
           },
         },
         "<"
       );
 
-      // console.log(prevIndex, newIndex);
       // Shift books (right of the target) to the right
     }
     currentIntersect = intersects[0];
@@ -421,16 +420,6 @@ const tick = () => {
     // intersect.object
   }
 
-  // for (const object of objectsToTest) {
-  //   if (!intersects.find((intersect) => intersect.object === object)) {
-  //     object.material.color.set("#ffffff");
-  //     // gsap.to(object.parent.parent.rotation, {
-  //     //   duration: 1,
-  //     //   z: -Math.PI / 2,
-  //     // });
-  //   }
-  // }
-
   // camera.position.y = Math.sin(elapsedTime);
   // camera.lookAt(new THREE.Vector3(0, -12, 0));
 
@@ -442,7 +431,6 @@ const tick = () => {
   // JS will call it on the next frame
   window.requestAnimationFrame(tick);
   stats.update();
-  // console.log(camera.position);
 };
 tick();
 
