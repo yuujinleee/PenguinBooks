@@ -10,6 +10,7 @@ import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { RectAreaLightHelper } from "three/examples/jsm/helpers/RectAreaLightHelper.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
+import { act } from "@react-three/fiber";
 
 //GUI and Stats
 const gui = new GUI();
@@ -99,6 +100,7 @@ for (let i = 0; i < TOTAL_BOOKS; i++) {
 let objectsToTest = [];
 
 const BOOK_GAP_X = 1.2;
+let BOOK_OPEN_ACTION = null;
 
 let bookCoverMat = null;
 gltfLoader.load(
@@ -196,7 +198,9 @@ gltfLoader.load(
 
     // BookOpenAnimation
     mixer = new THREE.AnimationMixer(gltf.scene);
-    const action = mixer.clipAction(gltf.animations[0]);
+    // let action = mixer.clipAction(gltf.animations[0]);
+    BOOK_OPEN_ACTION = gltf.animations[0];
+    // console.log(gltf);
     // action.play();
   },
   (progress) => {
@@ -223,7 +227,7 @@ addEventListener("wheel", (event) => {
   camera.position.x += event.deltaY * 0.01;
 });
 
-// Camera
+// Camera & Controls
 const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height);
 camera.position.z = 11;
 camera.position.y = 1;
@@ -275,9 +279,7 @@ const BOOK_SHIFT_DURATION = 0.7;
 const BOOK_SHIFT_X = 4;
 const BOOK_TARGET_OFFSET_X = 0.6;
 // const BOOK_TARGET_OFFSET_Z = -0.42;
-const BOOK_TARGET_OFFSET_Z = -0.6;
-// GUI Buffer Test
-// objectsToTest[2]
+const BOOK_TARGET_OFFSET_Z = 0.6;
 
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
@@ -298,8 +300,27 @@ const tick = () => {
     if (!currentIntersect && prevIndex !== newIndex) {
       console.log("mouse enter");
       // Target book Front cover animation (transform position and rotation)
-      // let targetBook = objectsToTest[newIndex].parent.parent;
       let targetBook = intersects[0].object.parent.parent;
+      targetBook.traverse(function (child) {
+        if (child.name === "pageFront") child.visible = true;
+        if (child.name === "pageBack") child.visible = true;
+      });
+
+      if (BOOK_OPEN_ACTION) {
+        if (mixer) mixer.stopAllAction();
+        mixer = new THREE.AnimationMixer(targetBook);
+        let action = mixer.clipAction(BOOK_OPEN_ACTION);
+        action.setLoop(THREE.LoopOnce);
+        action.clampWhenFinished = true;
+        setTimeout(() => {
+          // action.play(); // Start the animation after the delay
+        }, 1000);
+        // action.play();
+        console.log(mixer);
+      }
+      // console.log(targetBook.parent);
+      // const action = mixer.clipAction(targetBook.parent.animations[0]);
+      // action.play();
 
       gsap.to(targetBook.position, {
         duration: BOOK_SHIFT_DURATION,
@@ -334,7 +355,6 @@ const tick = () => {
                 {
                   duration: BOOK_SHIFT_DURATION,
                   z: -Math.PI / 2,
-                  onStart: console.log("B1"),
                 },
                 "<"
               );
@@ -357,6 +377,7 @@ const tick = () => {
                 );
               }
             }
+            // Shift books
             if (prevIndex === null) {
               // No previous target exists
               for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
@@ -366,7 +387,6 @@ const tick = () => {
                 });
               }
             } else {
-              // Previous Target Exists
               // New target is from left-hand side of last target
               if (newIndex < prevIndex) {
                 for (let i = newIndex + 1; i < prevIndex + 1; i++) {
@@ -387,6 +407,7 @@ const tick = () => {
               }
             }
             prevIndex = newIndex;
+            // To be deleted (just for unselected book color reset)
             for (const object of objectsToTest) {
               if (
                 !intersects.find((intersect) => intersect.object === object)
@@ -394,7 +415,6 @@ const tick = () => {
                 object.material.color.set("#ffffff");
               }
             }
-            // lastTargetBook = targetBook;
           },
           onComplete: function () {
             console.log("ENABLE raycaster");
@@ -403,8 +423,6 @@ const tick = () => {
         },
         "<"
       );
-
-      // Shift books (right of the target) to the right
     }
     currentIntersect = intersects[0];
   } else {
@@ -414,18 +432,17 @@ const tick = () => {
     currentIntersect = null;
   }
 
+  // To be deleted (just for selected book coloring red)
   for (const intersect of intersects) {
     // console.log(intersect.object);
     intersect.object.material.color.set("#ff0000");
-    // intersect.object
   }
 
-  // camera.position.y = Math.sin(elapsedTime);
-  // camera.lookAt(new THREE.Vector3(0, -12, 0));
-
   // console.log("tick");
+
   // Update controls
   // controls.update();
+
   // Render
   renderer.render(scene, camera);
   // JS will call it on the next frame
