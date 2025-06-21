@@ -9,7 +9,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { RectAreaLightHelper } from "three/examples/jsm/helpers/RectAreaLightHelper.js";
-import { render } from "vue";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 
 //GUI and Stats
@@ -99,6 +98,8 @@ for (let i = 0; i < TOTAL_BOOKS; i++) {
 
 let objectsToTest = [];
 
+const BOOK_GAP_X = 1.2;
+
 let bookCoverMat = null;
 gltfLoader.load(
   "/models/book.gltf",
@@ -112,7 +113,7 @@ gltfLoader.load(
     baseBook.traverse(function (child) {
       if (child.name === "pageFront") child.visible = false;
       if (child.name === "pageBack") child.visible = false;
-      if (child.isMesh === true) console.log(child.name);
+      // if (child.isMesh === true) console.log(child.name);
       if (child.isMesh && child.name === "bookCover_1") {
         child.material.metalness = 0.36;
         child.material.roughness = 0.61;
@@ -165,7 +166,7 @@ gltfLoader.load(
 
     for (let i = 0; i < NUM_BOOKS; i++) {
       const book = SkeletonUtils.clone(baseBook);
-      book.position.set(-3 + 1.2 * i, 0, 0);
+      book.position.set(-3 + BOOK_GAP_X * i, 0, 0);
       book.traverse((child) => {
         if (child.isMesh) {
           if (child.isMesh && child.name === "bookCover_1") {
@@ -184,10 +185,14 @@ gltfLoader.load(
         }
       });
       scene.add(book);
-      // console.log(objectsToTest);
     }
-
-    //
+    // const offsetFolder = gui.addFolder("Target Offset");
+    // offsetFolder
+    //   .add(objectsToTest[2].parent.parent.position, "x", -0.6, 3, 0.001)
+    //   .name("Offset X");
+    // offsetFolder
+    //   .add(objectsToTest[2].parent.parent.position, "z", -2, 0, 0.001)
+    //   .name("Offset Y");
 
     // BookOpenAnimation
     mixer = new THREE.AnimationMixer(gltf.scene);
@@ -195,12 +200,10 @@ gltfLoader.load(
     // action.play();
   },
   (progress) => {
-    console.log("progress");
-    console.log(progress);
+    console.log("progress", progress);
   },
   (error) => {
-    console.log("error");
-    console.log(error);
+    console.log("error", error);
   }
 );
 
@@ -267,18 +270,21 @@ let previousTime = 0;
 const raycaster = new THREE.Raycaster();
 let currentIntersect = null;
 
-// ---- GSAP
-// gsap.to(mesh.position, { duration: 1, delay: 1, x: 2 });
 let prevIndex = null;
 const BOOK_SHIFT_DURATION = 0.7;
-const BOOK_SHIFT_OFFSET_X = 4;
+const BOOK_SHIFT_X = 4;
+const BOOK_TARGET_OFFSET_X = 0.6;
+const BOOK_TARGET_OFFSET_Z = -0.42;
+// let lastTargetBook = null;
+// GUI Buffer Test
+// objectsToTest[2]
 
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
   const deltaTime = elapsedTime - previousTime;
   previousTime = elapsedTime;
 
-  // Model animtaion
+  // Book Open Animtaion
   if (mixer) {
     mixer.update(deltaTime);
   }
@@ -288,74 +294,118 @@ const tick = () => {
   const intersects = raycaster.intersectObjects(objectsToTest);
 
   if (intersects.length) {
-    if (!currentIntersect) {
+    if (
+      !currentIntersect &&
+      prevIndex !== objectsToTest.indexOf(intersects[0].object)
+    ) {
       console.log("mouse enter");
       // console.log(intersects[0].object.parent.parent);
 
-      // Target book - Front cover animation (transform position and rotation)
-      let targetBook = intersects[0].object.parent.parent;
+      // Target book Front cover animation (transform position and rotation)
+      let newIndex = objectsToTest.indexOf(intersects[0].object);
+      let targetBook = objectsToTest[newIndex].parent.parent;
+      // let targetBook = intersects[0].object.parent.parent;
 
-      gsap.to(targetBook.rotation, {
+      console.log("newIndex", newIndex);
+
+      gsap.to(targetBook.position, {
         duration: BOOK_SHIFT_DURATION,
-        z: 0,
+        x: targetBook.position.x + BOOK_TARGET_OFFSET_X,
+        z: BOOK_TARGET_OFFSET_Z,
         onStart: function () {
-          // gsap.to(targetBook.position, {
-          //   duration: BOOK_SHIFT_DURATION,
-          //   x: targetBook.position + 1,
-          // });
-          console.log("start");
+          console.log("A1");
           raycaster.layers.disableAll();
-          // Reset last target's transform to original (position and rotation)
-          for (const object of objectsToTest) {
-            if (!intersects.find((intersect) => intersect.object === object)) {
-              object.material.color.set("#ffffff");
-              gsap.to(object.parent.parent.rotation, {
-                duration: BOOK_SHIFT_DURATION,
-                z: -Math.PI / 2,
-              });
-            }
-          }
-        },
-        onComplete: function () {
-          console.log("finish");
-          raycaster.layers.enableAll();
         },
       });
+      gsap.to(
+        targetBook.rotation,
+        {
+          duration: BOOK_SHIFT_DURATION,
+          z: 0,
+          onStart: function () {
+            console.log("A2");
 
+            // Reset last target's transform to original (position and rotation)
+            if (prevIndex !== null) {
+              console.log("prevIndex : ", prevIndex);
+              let lastTargetBook = objectsToTest[prevIndex].parent.parent;
+              console.log(lastTargetBook);
+              gsap.to(
+                lastTargetBook.rotation,
+                {
+                  duration: BOOK_SHIFT_DURATION,
+                  z: -Math.PI / 2,
+                  onStart: console.log("B1"),
+                },
+                "<"
+              );
+              gsap.to(
+                lastTargetBook.position,
+                {
+                  duration: BOOK_SHIFT_DURATION,
+                  x: lastTargetBook.position.x - BOOK_TARGET_OFFSET_X,
+                  z: 0,
+                  onStart: console.log("B2"),
+                },
+                "<"
+              );
+            }
+            if (prevIndex === null) {
+              // No previous target exists
+              for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
+                gsap.to(objectsToTest[i].parent.parent.position, {
+                  duration: BOOK_SHIFT_DURATION,
+                  x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
+                  onStart: console.log("C1"),
+                });
+              }
+              // raycaster.layers.enableAll();
+            } else {
+              // Previous Target Exists
+
+              // New target is from left-hand side of last target
+              if (newIndex < prevIndex) {
+                for (let i = newIndex + 1; i < prevIndex + 1; i++) {
+                  gsap.to(objectsToTest[i].parent.parent.position, {
+                    duration: BOOK_SHIFT_DURATION,
+                    x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
+                    onStart: console.log("C2"),
+                  });
+                }
+              }
+              // New target is from right-hand side of last target
+              if (newIndex > prevIndex || prevIndex === 0) {
+                for (let i = prevIndex + 1; i < newIndex + 1; i++) {
+                  gsap.to(objectsToTest[i].parent.parent.position, {
+                    duration: BOOK_SHIFT_DURATION,
+                    x: objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_X,
+                    onStart: console.log("C3"),
+                  });
+                }
+              }
+            }
+            prevIndex = newIndex;
+            // for (const object of objectsToTest) {
+            //   if (!intersects.find((intersect) => intersect.object === object)) {
+            //     object.material.color.set("#ffffff");
+            //     gsap.to(object.parent.parent.rotation, {
+            //       duration: BOOK_SHIFT_DURATION,
+            //       z: -Math.PI / 2,
+            //     });
+            //   }
+            // }
+            // lastTargetBook = targetBook;
+          },
+          onComplete: function () {
+            console.log("FINISH");
+            raycaster.layers.enableAll();
+          },
+        },
+        "<"
+      );
+
+      // console.log(prevIndex, newIndex);
       // Shift books (right of the target) to the right
-      let newIndex = objectsToTest.indexOf(intersects[0].object);
-      if (!prevIndex) {
-        // No previous target exists
-        for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
-          gsap.to(objectsToTest[i].parent.parent.position, {
-            duration: BOOK_SHIFT_DURATION,
-            x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_OFFSET_X,
-          });
-        }
-      } else {
-        // New target is from left-hand side of last target
-        if (newIndex < prevIndex) {
-          for (let i = newIndex + 1; i < prevIndex + 1; i++) {
-            gsap.to(objectsToTest[i].parent.parent.position, {
-              duration: BOOK_SHIFT_DURATION,
-              x:
-                objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_OFFSET_X,
-            });
-          }
-        }
-        // New target is from right-hand side of last target
-        if (newIndex > prevIndex) {
-          if (prevIndex === 0) console.log("elo elo");
-          for (let i = prevIndex + 1; i < newIndex + 1; i++) {
-            gsap.to(objectsToTest[i].parent.parent.position, {
-              duration: BOOK_SHIFT_DURATION,
-              x:
-                objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_OFFSET_X,
-            });
-          }
-        }
-      }
-      prevIndex = newIndex;
     }
     currentIntersect = intersects[0];
   } else {
