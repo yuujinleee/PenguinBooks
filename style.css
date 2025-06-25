@@ -9,8 +9,129 @@
   left: 0;
 }
 
+@font-face {
+  font-family: "Hans Kendrick";
+  src: url("/fonts/HansKendrick-Regular.woff") format("woff");
+}
+
 html,
 body {
   /* remove any type of scrolling */
   overflow: hidden;
+  font-family: "Hans Kendrick", sans-serif;
+  color: #000;
+}
+
+#main-header {
+  position: absolute;
+  top: 1.25rem; /* 20px */
+  left: 0;
+  right: 0;
+  z-index: 10;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.25rem; /* 20px */
+  height: auto;
+  pointer-events: none;
+}
+
+#logo-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  /* width: min-content; */
+}
+
+#logo,
+#about {
+  pointer-events: auto; /* 클릭 가능하게 복구 */
+}
+
+#logo {
+  width: 40px;
+  height: auto;
+}
+
+#logo svg,
+#logo img {
+  width: 100%;
+  height: auto;
+}
+
+#small-title {
+  font-family: "Baskervville", serif;
+  font-size: 16px;
+  letter-spacing: -1px; /* 5% */
+  line-height: 1;
+  white-space: nowrap;
+  margin-bottom: 5px;
+}
+
+#about {
+  font-size: 14px;
+  margin-right: 1rem;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+#about:hover {
+  opacity: 0.6;
+}
+
+#start-screen {
+  position: absolute;
+  top: 13vh;
+  left: 50%;
+  transform: translateX(-50%); /* horizontal centering only */
+  z-index: 5;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+
+  pointer-events: none;
+  animation: fadeInUp 1s ease-out 0.5s both;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  100% {
+    opacity: 0.8;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+#main-title {
+  position: absolute;
+  left: 1%;
+  bottom: 2vh;
+  z-index: 5;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  font-family: "Baskervville", serif;
+  font-size: 210px;
+  letter-spacing: -10px; /* 5% */
+  line-height: 1;
+  white-space: nowrap;
+  /* margin: 0;
+  color: #000; */
+}
+
+.italic {
+  font-style: italic;
+}
+
+#scroll-indicator {
+  font-size: 14px;
+  opacity: 0.8;
+  transition: opacity 2s ease, transform 2s ease;
 }

@@ -4,12 +4,37 @@
 
 <head>
     <link rel="stylesheet" href="./style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Baskervville&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js proj#03</title>
+    <title>Penguin Clothbound Classics</title>
 </head>
 
 <body>
+    <header id="main-header">
+        <div id="logo-container">
+            <div id="logo">
+                <img src="/logo.svg" alt="logo" />
+            </div>
+            <div id="small-title">
+                <div>Penguin</div>
+                <div class="italic">Clothbound</div>
+                <div>Classics</div>
+            </div>
+        </div>
+        <div id="about">
+            About
+        </div>
+    </header>
+    <div id="main-title">
+        <div>Penguin</div>
+        <div class="italic">Clothbound</div>
+        <div>Classics</div>
+    </div>
+
+    <div id="start-screen">
+        <span id="scroll-indicator">Scroll to explore</span>
+    </div>
     <canvas class="webgl"></canvas>
     <script type="module" src="./script.js"></script>
 </body>

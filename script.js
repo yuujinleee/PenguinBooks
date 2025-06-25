@@ -6,14 +6,11 @@ import Stats from "three/addons/libs/stats.module.js";
 
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import { RectAreaLightHelper } from "three/examples/jsm/helpers/RectAreaLightHelper.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
-import { act } from "@react-three/fiber";
 
 //GUI and Stats
 const gui = new GUI();
+gui.close();
 document.body.appendChild(gui.domElement);
 const stats = new Stats();
 document.body.appendChild(stats.dom);
@@ -40,15 +37,8 @@ const axesHelper = new THREE.AxesHelper(30); //size
 scene.add(axesHelper);
 
 // Load Environment Map
-// const rgbeLoader = new RGBELoader();
-// rgbeLoader.load("/environmentMaps/field.hdr", (environmentMap) => {
-//   environmentMap.mapping = THREE.EquirectangularReflectionMapping;
-//   // scene.background = environmentMap;
-//   scene.environment = environmentMap;
-// });
 new EXRLoader().load("environmentMaps/interior.exr", function (texture) {
   texture.mapping = THREE.EquirectangularReflectionMapping;
-  // exrCubeRenderTarget = pmremGenerator.fromEquirectangular(texture);
   scene.environment = texture;
   scene.environmentIntensity = 0.644;
   scene.environmentRotation.y = 4.8;
@@ -57,28 +47,16 @@ new EXRLoader().load("environmentMaps/interior.exr", function (texture) {
   envFolder.add(scene.environmentRotation, "y", 4, 6.5, 0.001).name("Rotation");
 });
 
-// Load Wall Textures (to change with)
+// Load Book Model and Textures
+const gltfLoader = new GLTFLoader();
 const textureLoader = new THREE.TextureLoader();
-let wallMesh = null;
-let currentTextureIndex = 0;
 const TOTAL_BOOKS = 10;
 const NUM_BOOKS = 40;
-const textureCache = [];
-
-for (let i = 0; i < TOTAL_BOOKS; i++) {
-  textureCache.push(
-    textureLoader.load(`/models/textures/wall/wall${i}.png`, (tex) => {
-      tex.flipY = false;
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      tex.colorSpace = THREE.SRGBColorSpace;
-    })
-  );
-}
+const BOOK_GAP_X = 1.2;
+let bookCoverMat = null;
+let objectsToTest = [];
 
 // Load GLTF
-const gltfLoader = new GLTFLoader();
-let mixer = null;
 const bookFrontCache = [];
 const bookSideCache = [];
 
@@ -97,14 +75,8 @@ for (let i = 0; i < TOTAL_BOOKS; i++) {
   );
 }
 
-let objectsToTest = [];
-
-const BOOK_GAP_X = 1.2;
-let BOOK_OPEN_ACTION = null;
-
-let bookCoverMat = null;
 gltfLoader.load(
-  "/models/book.gltf",
+  "/models/book_NoBone.gltf",
   (gltf) => {
     // console.log("success");
     const baseBook = gltf.scene;
@@ -113,15 +85,12 @@ gltfLoader.load(
     baseBook.position.set(-7, 0, 0);
 
     baseBook.traverse(function (child) {
-      if (child.name === "pageFront") child.visible = false;
-      if (child.name === "pageBack") child.visible = false;
-      // if (child.isMesh === true) console.log(child.name);
-      if (child.isMesh && child.name === "bookCover_1") {
+      if (child.isMesh && child.name === "bookFront") {
         child.material.metalness = 0.36;
         child.material.roughness = 0.61;
         child.material.normalScale.set(2.2, 2.2);
       }
-      if (child.isMesh && child.name === "bookCover_3") {
+      if (child.isMesh && child.name === "bookSide") {
         child.material.metalness = 0.36;
         child.material.roughness = 0.61;
         child.material.normalScale.set(2.2, 2.2);
@@ -131,20 +100,20 @@ gltfLoader.load(
         const bookFolder = gui.addFolder("Book");
         bookFolder.add(bookCoverMat, "metalness", 0, 1, 0.001).onChange((v) => {
           scene.traverse(function (child) {
-            if (child.isMesh && child.name === "bookCover_1") {
+            if (child.isMesh && child.name === "bookFront") {
               child.material.metalness = v;
             }
-            if (child.isMesh && child.name === "bookCover_3") {
+            if (child.isMesh && child.name === "bookSide") {
               child.material.metalness = v;
             }
           });
         });
         bookFolder.add(bookCoverMat, "roughness", 0, 1, 0.001).onChange((v) => {
           scene.traverse(function (child) {
-            if (child.isMesh && child.name === "bookCover_1") {
+            if (child.isMesh && child.name === "bookFront") {
               child.material.roughness = v;
             }
-            if (child.isMesh && child.name === "bookCover_3") {
+            if (child.isMesh && child.name === "bookSide") {
               child.material.roughness = v;
             }
           });
@@ -154,10 +123,10 @@ gltfLoader.load(
           .name("normal strength")
           .onChange((v) => {
             scene.traverse(function (child) {
-              if (child.isMesh && child.name === "bookCover_1") {
+              if (child.isMesh && child.name === "bookFront") {
                 child.material.normalScale.set(v, v);
               }
-              if (child.isMesh && child.name === "bookCover_3") {
+              if (child.isMesh && child.name === "bookSide") {
                 child.material.normalScale.set(v, v);
               }
             });
@@ -167,18 +136,18 @@ gltfLoader.load(
     scene.add(baseBook);
 
     for (let i = 0; i < NUM_BOOKS; i++) {
-      const book = SkeletonUtils.clone(baseBook);
+      const book = baseBook.clone(true);
       book.position.set(-3 + BOOK_GAP_X * i, 0, 0);
       book.traverse((child) => {
         if (child.isMesh) {
-          if (child.isMesh && child.name === "bookCover_1") {
+          if (child.isMesh && child.name === "bookSide") {
             //bookSideMat
             child.material = child.material.clone();
             child.material.map = bookSideCache[i % TOTAL_BOOKS];
             child.material.needsUpdate = true;
             objectsToTest.push(child);
           }
-          if (child.isMesh && child.name === "bookCover_3") {
+          if (child.isMesh && child.name === "bookFront") {
             //bookFrontMat
             child.material = child.material.clone();
             child.material.map = bookFrontCache[i % TOTAL_BOOKS];
@@ -195,13 +164,6 @@ gltfLoader.load(
     // offsetFolder
     //   .add(objectsToTest[2].parent.parent.position, "z", -2, 0, 0.001)
     //   .name("Offset Y");
-
-    // BookOpenAnimation
-    mixer = new THREE.AnimationMixer(gltf.scene);
-    // let action = mixer.clipAction(gltf.animations[0]);
-    BOOK_OPEN_ACTION = gltf.animations[0];
-    // console.log(gltf);
-    // action.play();
   },
   (progress) => {
     console.log("progress", progress);
@@ -211,20 +173,19 @@ gltfLoader.load(
   }
 );
 
-// Change Wall Texture on Event
-// function wallChangeEvent(event) {
-//   // console.log(wallMesh);
-//   if (!wallMesh) return;
-//   currentTextureIndex = (currentTextureIndex + 1) % (TOTAL_BOOKS + 1);
-//   wallMesh.material.map = textureCache[currentTextureIndex];
-//   wallMesh.material.needsUpdate = true;
-//   console.log(`Switched to: wall${currentTextureIndex}.png`);
-// }
-// window.addEventListener("keydown", wallChangeEvent);
-
 addEventListener("wheel", (event) => {
   // console.log(event.deltaX, event.deltaY);
   camera.position.x += event.deltaY * 0.01;
+
+  // const indicator = document.getElementById("scroll-indicator");
+  // if (event.deltaY > 2) {
+  //   indicator.style.opacity = "0";
+  //   indicator.style.transform = "translateY(10px)";
+  // }
+  // } else {
+  //   indicator.style.opacity = "0.8";
+  //   indicator.style.transform = "translateY(0)";
+  // }
 });
 
 // Camera & Controls
@@ -248,16 +209,6 @@ scene.add(camera);
 // Lights
 // const ambLight = new THREE.AmbientLight(0x404040, 100); // soft white light
 // scene.add(ambLight);
-// color , intensity, width , height
-// const rectAreaLight = new THREE.RectAreaLight(0xffc900, 6, 12, 12);
-// rectAreaLight.position.set(0, -3, 30);
-// rectAreaLight.lookAt(new THREE.Vector3(0, -10, 30));
-// rectAreaLight.rotation.x = -0.4;
-// scene.add(rectAreaLight);
-// const rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
-// scene.add(rectAreaLightHelper);
-
-//Color, Intensity, Distance, decay
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({
@@ -278,18 +229,12 @@ let prevIndex = null;
 const BOOK_SHIFT_DURATION = 0.7;
 const BOOK_SHIFT_X = 4;
 const BOOK_TARGET_OFFSET_X = 0.6;
-// const BOOK_TARGET_OFFSET_Z = -0.42;
 const BOOK_TARGET_OFFSET_Z = -0.2;
 
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
   const deltaTime = elapsedTime - previousTime;
   previousTime = elapsedTime;
-
-  // Book Open Animtaion
-  if (mixer) {
-    mixer.update(deltaTime);
-  }
 
   // Raycaster
   raycaster.setFromCamera(mouse, camera);
@@ -300,27 +245,12 @@ const tick = () => {
     if (!currentIntersect && prevIndex !== newIndex) {
       console.log("mouse enter");
       // Target book Front cover animation (transform position and rotation)
-      let targetBook = intersects[0].object.parent.parent;
+      let targetBook = intersects[0].object.parent;
       targetBook.traverse(function (child) {
-        if (child.name === "pageFront") child.visible = true;
-        if (child.name === "pageBack") child.visible = true;
+        if (child.name === "pages") child.visible = true;
       });
 
-      if (BOOK_OPEN_ACTION) {
-        if (mixer) mixer.stopAllAction();
-        mixer = new THREE.AnimationMixer(targetBook);
-        let action = mixer.clipAction(BOOK_OPEN_ACTION);
-        action.setLoop(THREE.LoopOnce);
-        action.clampWhenFinished = true;
-        setTimeout(() => {
-          // action.play(); // Start the animation after the delay
-        }, 1000);
-        // action.play();
-        // console.log(mixer);
-      }
       // console.log(targetBook.parent);
-      // const action = mixer.clipAction(targetBook.parent.animations[0]);
-      // action.play();
 
       gsap.to(targetBook.position, {
         duration: BOOK_SHIFT_DURATION,
@@ -349,10 +279,9 @@ const tick = () => {
           onStart: function () {
             // Reset last target's transform to original (position and rotation)
             if (prevIndex !== null) {
-              let lastTargetBook = objectsToTest[prevIndex].parent.parent;
+              let lastTargetBook = objectsToTest[prevIndex].parent;
               lastTargetBook.traverse(function (child) {
-                if (child.name === "pageFront") child.visible = false;
-                if (child.name === "pageBack") child.visible = false;
+                if (child.name === "pages") child.visible = false;
               });
               gsap.to(
                 lastTargetBook.rotation,
@@ -385,40 +314,40 @@ const tick = () => {
             if (prevIndex === null) {
               // No previous target exists
               for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
-                gsap.to(objectsToTest[i].parent.parent.position, {
+                gsap.to(objectsToTest[i].parent.position, {
                   duration: BOOK_SHIFT_DURATION,
-                  x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
+                  x: objectsToTest[i].parent.position.x + BOOK_SHIFT_X,
                 });
               }
             } else {
               // New target is from left-hand side of last target
               if (newIndex < prevIndex) {
                 for (let i = newIndex + 1; i < prevIndex + 1; i++) {
-                  gsap.to(objectsToTest[i].parent.parent.position, {
+                  gsap.to(objectsToTest[i].parent.position, {
                     duration: BOOK_SHIFT_DURATION,
-                    x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
+                    x: objectsToTest[i].parent.position.x + BOOK_SHIFT_X,
                   });
                 }
               }
               // New target is from right-hand side of last target
               if (newIndex > prevIndex) {
                 for (let i = prevIndex + 1; i < newIndex + 1; i++) {
-                  gsap.to(objectsToTest[i].parent.parent.position, {
+                  gsap.to(objectsToTest[i].parent.position, {
                     duration: BOOK_SHIFT_DURATION,
-                    x: objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_X,
+                    x: objectsToTest[i].parent.position.x - BOOK_SHIFT_X,
                   });
                 }
               }
             }
             prevIndex = newIndex;
             // To be deleted (just for unselected book color reset)
-            for (const object of objectsToTest) {
-              if (
-                !intersects.find((intersect) => intersect.object === object)
-              ) {
-                object.material.color.set("#ffffff");
-              }
-            }
+            // for (const object of objectsToTest) {
+            //   if (
+            //     !intersects.find((intersect) => intersect.object === object)
+            //   ) {
+            //     object.material.color.set("#ffffff");
+            //   }
+            // }
           },
           onComplete: function () {
             console.log("ENABLE raycaster");
