@@ -34,7 +34,7 @@ window.addEventListener("mousemove", (event) => {
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf6f6ee);
+scene.background = new THREE.Color(0xffffff);
 // AxesHelper
 const axesHelper = new THREE.AxesHelper(30); //size
 scene.add(axesHelper);
@@ -279,7 +279,7 @@ const BOOK_SHIFT_DURATION = 0.7;
 const BOOK_SHIFT_X = 4;
 const BOOK_TARGET_OFFSET_X = 0.6;
 // const BOOK_TARGET_OFFSET_Z = -0.42;
-const BOOK_TARGET_OFFSET_Z = 0.6;
+const BOOK_TARGET_OFFSET_Z = -0.2;
 
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
@@ -316,7 +316,7 @@ const tick = () => {
           // action.play(); // Start the animation after the delay
         }, 1000);
         // action.play();
-        console.log(mixer);
+        // console.log(mixer);
       }
       // console.log(targetBook.parent);
       // const action = mixer.clipAction(targetBook.parent.animations[0]);
@@ -350,6 +350,10 @@ const tick = () => {
             // Reset last target's transform to original (position and rotation)
             if (prevIndex !== null) {
               let lastTargetBook = objectsToTest[prevIndex].parent.parent;
+              lastTargetBook.traverse(function (child) {
+                if (child.name === "pageFront") child.visible = false;
+                if (child.name === "pageBack") child.visible = false;
+              });
               gsap.to(
                 lastTargetBook.rotation,
                 {
@@ -433,10 +437,9 @@ const tick = () => {
   }
 
   // To be deleted (just for selected book coloring red)
-  for (const intersect of intersects) {
-    // console.log(intersect.object);
-    intersect.object.material.color.set("#ff0000");
-  }
+  // for (const intersect of intersects) {
+  //   intersect.object.material.color.set("#ff0000");
+  // }
 
   // console.log("tick");
 
