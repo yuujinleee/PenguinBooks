@@ -133,11 +133,11 @@ gltfLoader.load(
           });
       }
     });
-    scene.add(baseBook);
+    // scene.add(baseBook);
 
     for (let i = 0; i < NUM_BOOKS; i++) {
       const book = baseBook.clone(true);
-      book.position.set(-3 + BOOK_GAP_X * i, 0, 0);
+      book.position.set(0.1 + BOOK_GAP_X * i, 0, 0);
       book.traverse((child) => {
         if (child.isMesh) {
           if (child.isMesh && child.name === "bookSide") {
@@ -173,11 +173,32 @@ gltfLoader.load(
   }
 );
 
+const scrollIndicator = document.getElementById("scroll-indicator");
+let fadeTimeout, idleTimeout;
+
 addEventListener("wheel", (event) => {
   // console.log(event.deltaX, event.deltaY);
   camera.position.x += event.deltaY * 0.01;
+  // console.log(camera.position.x);
+  const title = document.getElementById("main-title");
+  title.style.left = `${20 - (camera.position.x / 7.25) * 850}px`;
+  if (camera.position.x > 7.25) {
+    title.style.display = "none";
+  } else {
+    title.style.display = "flex";
+  }
 
-  // const indicator = document.getElementById("scroll-indicator");
+  scrollIndicator.style.animation = "fadeOut 0.6s ease forwards";
+
+  clearTimeout(idleTimeout);
+  idleTimeout = setTimeout(() => {
+    scrollIndicator.style.animation = "fadeIn 2s ease forwards";
+    setTimeout(() => {
+      // fadeIn 완료 후 blink 재시작
+      scrollIndicator.style.animation = "blinkOpacity 3s ease-in-out infinite";
+    }, 2000); // fadeIn duration
+  }, 1000);
+
   // if (event.deltaY > 2) {
   //   indicator.style.opacity = "0";
   //   indicator.style.transform = "translateY(10px)";
