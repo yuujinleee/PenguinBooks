@@ -82,7 +82,7 @@ body {
 
 #start-screen {
   position: absolute;
-  top: 16vh;
+  top: 19vh;
   left: 50%;
   transform: translateX(-50%); /* horizontal centering only */
   z-index: 5;
@@ -96,6 +96,16 @@ body {
   animation: fadeInUp 1s ease-out 0.5s both;
 }
 
+#scroll-indicator {
+  font-size: 14px;
+  animation: blinkOpacity 3s ease-in-out infinite;
+}
+
+#click-indicator {
+  font-size: 14px;
+  display: none;
+}
+
 @keyframes fadeInUp {
   0% {
     opacity: 0;
@@ -105,11 +115,6 @@ body {
     opacity: 0.8;
     transform: translateX(-50%) translateY(0);
   }
-}
-
-#scroll-indicator {
-  opacity: 1;
-  animation: blinkOpacity 3s ease-in-out infinite;
 }
 
 @keyframes blinkOpacity {
@@ -161,22 +166,18 @@ body {
   font-style: italic;
 }
 
-#scroll-indicator {
-  font-size: 14px;
-  opacity: 0.8;
-  transition: opacity 2s ease, transform 2s ease;
-}
-
 #book-info-screen {
   height: 100%;
-  width: 50%;
+  width: 40vw;
   position: fixed;
-
   top: 24vh;
-  right: 0;
+  right: 5vw;
 
   z-index: 1;
   overflow-x: hidden;
+
+  opacity: 0;
+
   /* padding-top: 20px; */
   /* padding: 0 40px; */
   /* padding-right: 20px; */

@@ -50,6 +50,7 @@ new EXRLoader().load("environmentMaps/interior.exr", function (texture) {
 // Load Book Model and Textures
 const gltfLoader = new GLTFLoader();
 const textureLoader = new THREE.TextureLoader();
+
 const TOTAL_BOOKS = 10;
 const NUM_BOOKS = 40;
 const BOOK_GAP_X = 1.2;
@@ -97,40 +98,40 @@ gltfLoader.load(
 
         //GUI
         bookCoverMat = child.material;
-        const bookFolder = gui.addFolder("Book");
-        bookFolder.add(bookCoverMat, "metalness", 0, 1, 0.001).onChange((v) => {
-          scene.traverse(function (child) {
-            if (child.isMesh && child.name === "bookFront") {
-              child.material.metalness = v;
-            }
-            if (child.isMesh && child.name === "bookSide") {
-              child.material.metalness = v;
-            }
-          });
-        });
-        bookFolder.add(bookCoverMat, "roughness", 0, 1, 0.001).onChange((v) => {
-          scene.traverse(function (child) {
-            if (child.isMesh && child.name === "bookFront") {
-              child.material.roughness = v;
-            }
-            if (child.isMesh && child.name === "bookSide") {
-              child.material.roughness = v;
-            }
-          });
-        });
-        bookFolder
-          .add(bookCoverMat.normalScale, "x", 0, 8, 0.01)
-          .name("normal strength")
-          .onChange((v) => {
-            scene.traverse(function (child) {
-              if (child.isMesh && child.name === "bookFront") {
-                child.material.normalScale.set(v, v);
-              }
-              if (child.isMesh && child.name === "bookSide") {
-                child.material.normalScale.set(v, v);
-              }
-            });
-          });
+        // const bookFolder = gui.addFolder("Book");
+        // bookFolder.add(bookCoverMat, "metalness", 0, 1, 0.001).onChange((v) => {
+        //   scene.traverse(function (child) {
+        //     if (child.isMesh && child.name === "bookFront") {
+        //       child.material.metalness = v;
+        //     }
+        //     if (child.isMesh && child.name === "bookSide") {
+        //       child.material.metalness = v;
+        //     }
+        //   });
+        // });
+        // bookFolder.add(bookCoverMat, "roughness", 0, 1, 0.001).onChange((v) => {
+        //   scene.traverse(function (child) {
+        //     if (child.isMesh && child.name === "bookFront") {
+        //       child.material.roughness = v;
+        //     }
+        //     if (child.isMesh && child.name === "bookSide") {
+        //       child.material.roughness = v;
+        //     }
+        //   });
+        // });
+        // bookFolder
+        //   .add(bookCoverMat.normalScale, "x", 0, 8, 0.01)
+        //   .name("normal strength")
+        //   .onChange((v) => {
+        //     scene.traverse(function (child) {
+        //       if (child.isMesh && child.name === "bookFront") {
+        //         child.material.normalScale.set(v, v);
+        //       }
+        //       if (child.isMesh && child.name === "bookSide") {
+        //         child.material.normalScale.set(v, v);
+        //       }
+        //     });
+        //   });
       }
     });
     // scene.add(baseBook);
@@ -173,42 +174,6 @@ gltfLoader.load(
   }
 );
 
-const scrollIndicator = document.getElementById("scroll-indicator");
-let fadeTimeout, idleTimeout;
-
-addEventListener("wheel", (event) => {
-  // console.log(event.deltaX, event.deltaY);
-  camera.position.x += event.deltaY * 0.01;
-  // console.log(camera.position.x);
-  const title = document.getElementById("main-title");
-  title.style.left = `${20 - (camera.position.x / 7.25) * 850}px`;
-  if (camera.position.x > 7.25) {
-    title.style.display = "none";
-  } else {
-    title.style.display = "flex";
-  }
-
-  scrollIndicator.style.animation = "fadeOut 0.6s ease forwards";
-
-  clearTimeout(idleTimeout);
-  idleTimeout = setTimeout(() => {
-    scrollIndicator.style.animation = "fadeIn 2s ease forwards";
-    setTimeout(() => {
-      // fadeIn 완료 후 blink 재시작
-      scrollIndicator.style.animation = "blinkOpacity 3s ease-in-out infinite";
-    }, 2000); // fadeIn duration
-  }, 1000);
-
-  // if (event.deltaY > 2) {
-  //   indicator.style.opacity = "0";
-  //   indicator.style.transform = "translateY(10px)";
-  // }
-  // } else {
-  //   indicator.style.opacity = "0.8";
-  //   indicator.style.transform = "translateY(0)";
-  // }
-});
-
 // Camera & Controls
 const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height);
 camera.position.z = 11;
@@ -217,6 +182,11 @@ camera.position.y = 1;
 // const controls = new OrbitControls(camera, canvas);
 // controls.target.y = 1;
 // controls.enableDamping = true;
+// controls.enableRotate = true;
+// controls.enableZoom = false;
+// controls.enablePan = false;
+// controls.minPolarAngle = 0;
+// controls.maxPolarAngle = 0;
 
 // gui.add(camera.position, "y", 0, 1, 0.01).onChange((v) => {
 //   controls.target.y = v;
@@ -252,6 +222,107 @@ const BOOK_SHIFT_X = 4;
 const BOOK_TARGET_OFFSET_X = 0.6;
 const BOOK_TARGET_OFFSET_Z = -0.2;
 
+const BOOK_ENTER_DURATION = 2;
+
+// Events
+
+let targetBook;
+let isMouseOnTarget = false;
+let isInfoPageActive = false;
+
+window.addEventListener("click", () => {
+  if (isMouseOnTarget) {
+    // const fovRad = (45 * Math.PI) / 180;
+    // const visibleHeight = 2 * Math.tan(fovRad / 2) * 11; //9.11269837220809
+    const visibleWidth = 9.11 * (canvas.width / canvas.height);
+    const bookWidthPx = canvas.height * 0.45 * 0.5;
+    const bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
+    const infoScreenHTML = document.getElementById("book-info-screen");
+
+    if (!isInfoPageActive) {
+      console.log("✅ Clicked on target book");
+      // enter Book Detail Page
+      // 모바일 일 시 :         x: targetBook.position.x + bookWorldWidth,
+      gsap.to(camera.position, {
+        duration: BOOK_ENTER_DURATION,
+        x: targetBook.position.x + bookWorldWidth + visibleWidth / 4,
+        y: -11,
+      });
+      gsap.to(targetBook.position, {
+        duration: BOOK_ENTER_DURATION,
+        y: -11,
+      });
+      gsap.to(targetBook.rotation, {
+        duration: BOOK_ENTER_DURATION,
+        z: Math.PI * 2,
+      });
+      isInfoPageActive = true;
+
+      // infoScreenHTML.style.animation = `fadeIn ${BOOK_ENTER_DURATION}s ease forwards`;
+      setTimeout(() => {
+        infoScreenHTML.style.animation = `fadeIn ${BOOK_ENTER_DURATION}s ease forwards`;
+      }, 400);
+    } else {
+      infoScreenHTML.style.animation = `fadeOut 1s ease forwards`;
+
+      gsap.to(camera.position, {
+        duration: BOOK_ENTER_DURATION,
+        x: targetBook.position.x + bookWorldWidth,
+        y: 1,
+      });
+      gsap.to(targetBook.position, {
+        duration: BOOK_ENTER_DURATION,
+        y: 0,
+      });
+      gsap.to(targetBook.rotation, {
+        duration: BOOK_ENTER_DURATION,
+        z: 0,
+      });
+      isInfoPageActive = false;
+    }
+    //
+  }
+});
+
+const scrollIndicator = document.getElementById("scroll-indicator");
+const clickIndicator = document.getElementById("click-indicator");
+let idleTimeout;
+
+addEventListener("wheel", (event) => {
+  // console.log(event.deltaX, event.deltaY);
+  if (!isInfoPageActive) {
+    camera.position.x += event.deltaY * 0.01;
+    // console.log(camera.position.x);
+    const title = document.getElementById("main-title");
+    title.style.left = `${20 - (camera.position.x / 7.25) * 850}px`;
+    if (camera.position.x > 7.25) {
+      title.style.display = "none";
+    } else {
+      title.style.display = "flex";
+    }
+
+    scrollIndicator.style.animation = "fadeOut 0.6s ease forwards";
+
+    clearTimeout(idleTimeout);
+    idleTimeout = setTimeout(() => {
+      scrollIndicator.style.animation = "fadeIn 2s ease forwards";
+      setTimeout(() => {
+        // fadeIn 완료 후 blink 재시작
+        scrollIndicator.style.animation =
+          "blinkOpacity 3s ease-in-out infinite";
+      }, 2000); // fadeIn duration
+    }, 1000);
+  }
+  // if (event.deltaY > 2) {
+  //   indicator.style.opacity = "0";
+  //   indicator.style.transform = "translateY(10px)";
+  // }
+  // } else {
+  //   indicator.style.opacity = "0.8";
+  //   indicator.style.transform = "translateY(0)";
+  // }
+});
+
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
   const deltaTime = elapsedTime - previousTime;
@@ -260,13 +331,40 @@ const tick = () => {
   // Raycaster
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(objectsToTest);
+  if (targetBook) {
+    // targetBook.children[2] //bookfront mesh
+
+    isMouseOnTarget =
+      raycaster.intersectObject(targetBook.children[2]).length > 0;
+    // console.log(isMouseOnTarget);
+
+    if (isMouseOnTarget) {
+      document.body.style.cursor = "pointer";
+    } else {
+      document.body.style.cursor = "default";
+    }
+  } else {
+    // clickIndicator.style.animation = "fadeOut 0.3s ease forwards";
+    // setTimeout(() => {
+    //   clickIndicator.style.display = "none";
+    //   scrollIndicator.style.display = "block";
+    //   scrollIndicator.style.animation = "fadeIn 0.3s ease forwards";
+    // }, 300);
+  }
 
   if (intersects.length) {
+    // console.log("mouse enter");
     let newIndex = objectsToTest.indexOf(intersects[0].object);
+    scrollIndicator.style.animation = "fadeOut 0.3s ease forwards";
+    setTimeout(() => {
+      scrollIndicator.style.display = "none";
+      clickIndicator.style.display = "block";
+      clickIndicator.style.animation = "fadeIn 0.3s ease forwards";
+    }, 350);
+
     if (!currentIntersect && prevIndex !== newIndex) {
-      console.log("mouse enter");
       // Target book Front cover animation (transform position and rotation)
-      let targetBook = intersects[0].object.parent;
+      targetBook = intersects[0].object.parent;
       targetBook.traverse(function (child) {
         if (child.name === "pages") child.visible = true;
       });
@@ -381,7 +479,13 @@ const tick = () => {
     currentIntersect = intersects[0];
   } else {
     if (currentIntersect) {
-      // console.log("mouse leave");
+      console.log("mouse leave");
+      clickIndicator.style.animation = "fadeOut 0.3s ease forwards";
+      setTimeout(() => {
+        clickIndicator.style.display = "none";
+        scrollIndicator.style.display = "block";
+        scrollIndicator.style.animation = "fadeIn 0.3s ease forwards";
+      }, 300);
     }
     currentIntersect = null;
   }
