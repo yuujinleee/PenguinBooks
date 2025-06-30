@@ -77,7 +77,7 @@ for (let i = 0; i < TOTAL_BOOKS; i++) {
 }
 
 gltfLoader.load(
-  "/models/book_NoBone.gltf",
+  "/models/book_NoBone2.gltf",
   (gltf) => {
     // console.log("success");
     const baseBook = gltf.scene;
@@ -180,13 +180,14 @@ camera.position.z = 11;
 camera.position.y = 1;
 
 // const controls = new OrbitControls(camera, canvas);
-// controls.target.y = 1;
+// controls.target.y = camera.position.y;
 // controls.enableDamping = true;
-// controls.enableRotate = true;
 // controls.enableZoom = false;
 // controls.enablePan = false;
-// controls.minPolarAngle = 0;
-// controls.maxPolarAngle = 0;
+// controls.minPolarAngle = Math.PI / 2;
+// controls.maxPolarAngle = Math.PI / 2;
+// controls.enabled = false;
+// controls.update();
 
 // gui.add(camera.position, "y", 0, 1, 0.01).onChange((v) => {
 //   controls.target.y = v;
@@ -221,6 +222,7 @@ const BOOK_SHIFT_DURATION = 0.7;
 const BOOK_SHIFT_X = 4;
 const BOOK_TARGET_OFFSET_X = 0.6;
 const BOOK_TARGET_OFFSET_Z = -0.2;
+const BOOK_EMPTY_X = 1.9173; //1.9172899723052979
 
 const BOOK_ENTER_DURATION = 2;
 
@@ -248,17 +250,29 @@ window.addEventListener("click", () => {
         x: targetBook.position.x + bookWorldWidth + visibleWidth / 4,
         y: -11,
       });
-      gsap.to(targetBook.position, {
-        duration: BOOK_ENTER_DURATION,
-        y: -11,
-      });
-      gsap.to(targetBook.rotation, {
-        duration: BOOK_ENTER_DURATION,
-        z: Math.PI * 2,
-      });
+      gsap.to(
+        targetBook.position,
+        {
+          duration: BOOK_ENTER_DURATION,
+          y: -11,
+        },
+        "<"
+      );
+      gsap.to(
+        targetBook.children[0].rotation,
+        {
+          duration: BOOK_ENTER_DURATION,
+          z: Math.PI * 2,
+          // ease: "power2.out",
+        },
+        "<"
+      );
+      // controls.target.x = targetBook.position.x + bookWorldWidth + visibleWidth / 4;
+      // controls.target.y = -11;
+
+      // controls.enabled = true;
       isInfoPageActive = true;
 
-      // infoScreenHTML.style.animation = `fadeIn ${BOOK_ENTER_DURATION}s ease forwards`;
       setTimeout(() => {
         infoScreenHTML.style.animation = `fadeIn ${BOOK_ENTER_DURATION}s ease forwards`;
       }, 400);
@@ -270,15 +284,34 @@ window.addEventListener("click", () => {
         x: targetBook.position.x + bookWorldWidth,
         y: 1,
       });
-      gsap.to(targetBook.position, {
-        duration: BOOK_ENTER_DURATION,
-        y: 0,
-      });
-      gsap.to(targetBook.rotation, {
-        duration: BOOK_ENTER_DURATION,
-        z: 0,
-      });
+      gsap.to(
+        targetBook.position,
+        {
+          duration: BOOK_ENTER_DURATION,
+          y: 0,
+        },
+        "<"
+      );
+      gsap.to(
+        targetBook.children[0].rotation,
+        {
+          duration: BOOK_ENTER_DURATION,
+          z: 0,
+          onStart: function () {
+            console.log("DISABLE raycaster");
+            raycaster.layers.disableAll();
+          },
+          onComplete: function () {
+            setTimeout(() => {
+              console.log("ENABLE raycaster");
+              raycaster.layers.enableAll();
+            }, 400);
+          },
+        },
+        "<"
+      );
       isInfoPageActive = false;
+      // controls.enabled = false;
     }
     //
   }
@@ -287,6 +320,19 @@ window.addEventListener("click", () => {
 const scrollIndicator = document.getElementById("scroll-indicator");
 const clickIndicator = document.getElementById("click-indicator");
 let idleTimeout;
+
+function showAndHideIndicator(a, b) {
+  a.style.animation = "fadeOut 0.6s ease forwards";
+  setTimeout(() => {
+    a.style.display = "none";
+    b.style.display = "block";
+    b.style.animation = "fadeIn 2s ease forwards";
+    // setTimeout(() => {
+    //   // fadeIn 완료 후 blink 재시작
+    //   b.style.animation = "blinkOpacity 3s ease-in-out infinite";
+    // }, 2000); // fadeIn duration
+  }, 1000);
+}
 
 addEventListener("wheel", (event) => {
   // console.log(event.deltaX, event.deltaY);
@@ -333,9 +379,14 @@ const tick = () => {
   const intersects = raycaster.intersectObjects(objectsToTest);
   if (targetBook) {
     // targetBook.children[2] //bookfront mesh
-
-    isMouseOnTarget =
-      raycaster.intersectObject(targetBook.children[2]).length > 0;
+    // console.log(targetBook);
+    targetBook.traverse(function (child) {
+      if (child.isMesh && child.name === "bookFront") {
+        isMouseOnTarget = raycaster.intersectObject(child).length > 0;
+      }
+    });
+    // isMouseOnTarget =
+    //   raycaster.intersectObject(targetBook.children[0].children[2]).length > 0;
     // console.log(isMouseOnTarget);
 
     if (isMouseOnTarget) {
@@ -355,19 +406,16 @@ const tick = () => {
   if (intersects.length) {
     // console.log("mouse enter");
     let newIndex = objectsToTest.indexOf(intersects[0].object);
-    scrollIndicator.style.animation = "fadeOut 0.3s ease forwards";
-    setTimeout(() => {
-      scrollIndicator.style.display = "none";
-      clickIndicator.style.display = "block";
-      clickIndicator.style.animation = "fadeIn 0.3s ease forwards";
-    }, 350);
+    // scrollIndicator.style.animation = "fadeOut 0.3s ease forwards";
+    // setTimeout(() => {
+    //   scrollIndicator.style.display = "none";
+    //   clickIndicator.style.display = "block";
+    //   clickIndicator.style.animation = "fadeIn 0.3s ease forwards";
+    // }, 350);
 
     if (!currentIntersect && prevIndex !== newIndex) {
       // Target book Front cover animation (transform position and rotation)
-      targetBook = intersects[0].object.parent;
-      targetBook.traverse(function (child) {
-        if (child.name === "pages") child.visible = true;
-      });
+      targetBook = intersects[0].object.parent.parent;
 
       // console.log(targetBook.parent);
 
@@ -380,16 +428,16 @@ const tick = () => {
           raycaster.layers.disableAll();
         },
       });
-      for (let c of targetBook.children) {
-        gsap.to(
-          c.position,
-          {
-            duration: BOOK_SHIFT_DURATION,
-            x: BOOK_TARGET_OFFSET_X,
-          },
-          "<"
-        );
-      }
+      // console.log(targetBook.children[0].position.x);
+      gsap.to(
+        targetBook.children[0].position,
+        {
+          duration: BOOK_SHIFT_DURATION,
+          x: BOOK_EMPTY_X + BOOK_TARGET_OFFSET_X,
+        },
+        "<"
+      );
+
       gsap.to(
         targetBook.rotation,
         {
@@ -398,10 +446,8 @@ const tick = () => {
           onStart: function () {
             // Reset last target's transform to original (position and rotation)
             if (prevIndex !== null) {
-              let lastTargetBook = objectsToTest[prevIndex].parent;
-              lastTargetBook.traverse(function (child) {
-                if (child.name === "pages") child.visible = false;
-              });
+              let lastTargetBook = objectsToTest[prevIndex].parent.parent;
+
               gsap.to(
                 lastTargetBook.rotation,
                 {
@@ -418,42 +464,40 @@ const tick = () => {
                 },
                 "<"
               );
-              for (let c of lastTargetBook.children) {
-                gsap.to(
-                  c.position,
-                  {
-                    duration: BOOK_SHIFT_DURATION,
-                    x: 0,
-                  },
-                  "<"
-                );
-              }
+              gsap.to(
+                lastTargetBook.children[0].position,
+                {
+                  duration: BOOK_SHIFT_DURATION,
+                  x: BOOK_EMPTY_X,
+                },
+                "<"
+              );
             }
             // Shift books
             if (prevIndex === null) {
               // No previous target exists
               for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
-                gsap.to(objectsToTest[i].parent.position, {
+                gsap.to(objectsToTest[i].parent.parent.position, {
                   duration: BOOK_SHIFT_DURATION,
-                  x: objectsToTest[i].parent.position.x + BOOK_SHIFT_X,
+                  x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
                 });
               }
             } else {
               // New target is from left-hand side of last target
               if (newIndex < prevIndex) {
                 for (let i = newIndex + 1; i < prevIndex + 1; i++) {
-                  gsap.to(objectsToTest[i].parent.position, {
+                  gsap.to(objectsToTest[i].parent.parent.position, {
                     duration: BOOK_SHIFT_DURATION,
-                    x: objectsToTest[i].parent.position.x + BOOK_SHIFT_X,
+                    x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
                   });
                 }
               }
               // New target is from right-hand side of last target
               if (newIndex > prevIndex) {
                 for (let i = prevIndex + 1; i < newIndex + 1; i++) {
-                  gsap.to(objectsToTest[i].parent.position, {
+                  gsap.to(objectsToTest[i].parent.parent.position, {
                     duration: BOOK_SHIFT_DURATION,
-                    x: objectsToTest[i].parent.position.x - BOOK_SHIFT_X,
+                    x: objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_X,
                   });
                 }
               }
@@ -498,7 +542,7 @@ const tick = () => {
   // console.log("tick");
 
   // Update controls
-  // controls.update();
+  // if (isInfoPageActive) controls.update();
 
   // Render
   renderer.render(scene, camera);
@@ -514,6 +558,13 @@ window.addEventListener("resize", () => {
   sizes.width = window.innerWidth;
   sizes.height = window.innerHeight;
   // Update camera
+  if (isInfoPageActive) {
+    const visibleWidth = 9.11 * (canvas.width / canvas.height);
+    const bookWidthPx = canvas.height * 0.45 * 0.5;
+    const bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
+    camera.position.x =
+      targetBook.position.x + bookWorldWidth + visibleWidth / 4;
+  }
   camera.aspect = sizes.width / sizes.height;
   camera.updateProjectionMatrix();
   // Update renderer
