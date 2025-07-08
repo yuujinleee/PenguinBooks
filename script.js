@@ -7,6 +7,7 @@ import Stats from "three/addons/libs/stats.module.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
+import { ObjectControls } from "./ObjectControls.js";
 
 //GUI and Stats
 const gui = new GUI();
@@ -177,6 +178,11 @@ gltfLoader.load(
 // Camera & Controls
 const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height);
 camera.position.z = 11;
+
+// if (window.innerWidth <= 767) {
+//   camera.position.z = 20;
+// }
+
 camera.position.y = 1;
 
 // const controls = new OrbitControls(camera, canvas);
@@ -231,110 +237,170 @@ const BOOK_ENTER_DURATION = 2;
 let targetBook;
 let isMouseOnTarget = false;
 let isInfoPageActive = false;
+const infoScreenHTML = document.getElementById("book-info-screen");
+// const fovRad = (45 * Math.PI) / 180;
+// const visibleHeight = 2 * Math.tan(fovRad / 2) * 11; //9.11269837220809
+let visibleWidth = 9.11 * (canvas.width / canvas.height);
+let bookWidthPx = canvas.height * 0.45 * 0.5;
+let bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
 
-window.addEventListener("click", () => {
+let objectControls;
+
+window.addEventListener("pointerup", () => {
   if (isMouseOnTarget) {
-    // const fovRad = (45 * Math.PI) / 180;
-    // const visibleHeight = 2 * Math.tan(fovRad / 2) * 11; //9.11269837220809
-    const visibleWidth = 9.11 * (canvas.width / canvas.height);
-    const bookWidthPx = canvas.height * 0.45 * 0.5;
-    const bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
-    const infoScreenHTML = document.getElementById("book-info-screen");
-
     if (!isInfoPageActive) {
+      isInfoPageActive = true;
+
       console.log("✅ Clicked on target book");
+
+      const axesHelper = new THREE.AxesHelper(10);
+      targetBook.children[0].add(axesHelper);
+
+      targetBook.children[0].rotation.order = "YXZ";
+      objectControls = new ObjectControls({
+        object: targetBook.children[0], // 예: targetBook
+        camera,
+        domElement: renderer.domElement,
+        enableXRotation: true,
+        enableYRotation: false,
+        // dampingFactor={0.1}
+        // maxRotationX: 0,
+        // minRotationX: 0,
+        // enableXRotation={true}
+        // enableYRotation={true}
+      });
+
+      console.log(targetBook.children[0].rotation);
+      showIndicator(backIndicator);
+      setTimeout(() => {
+        infoScreenHTML.style.animation = `fadeInReveal 1s ease-out forwards`;
+      }, 900);
+      visibleWidth = 9.11 * (canvas.width / canvas.height);
+      bookWidthPx = canvas.height * 0.45 * 0.5;
+      bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
       // enter Book Detail Page
-      // 모바일 일 시 :         x: targetBook.position.x + bookWorldWidth,
-      gsap.to(camera.position, {
+      // 모바일 일 시 :         x: targetBook.position.x + bookWorldWidth
+
+      const tl = gsap.timeline();
+
+      tl.to(camera.position, {
         duration: BOOK_ENTER_DURATION,
         x: targetBook.position.x + bookWorldWidth + visibleWidth / 4,
         y: -11,
-      });
-      gsap.to(
-        targetBook.position,
-        {
-          duration: BOOK_ENTER_DURATION,
-          y: -11,
-        },
-        "<"
-      );
-      gsap.to(
-        targetBook.children[0].rotation,
-        {
-          duration: BOOK_ENTER_DURATION,
-          z: Math.PI * 2,
-          // ease: "power2.out",
-        },
-        "<"
-      );
+      })
+        .to(
+          targetBook.position,
+          {
+            duration: BOOK_ENTER_DURATION,
+            y: -11,
+          },
+          "<"
+        )
+        .to(
+          targetBook.children[0].rotation,
+          {
+            duration: BOOK_ENTER_DURATION,
+            z: Math.PI * 2,
+          },
+          "<"
+        );
       // controls.target.x = targetBook.position.x + bookWorldWidth + visibleWidth / 4;
       // controls.target.y = -11;
 
       // controls.enabled = true;
-      isInfoPageActive = true;
-
-      setTimeout(() => {
-        infoScreenHTML.style.animation = `fadeIn ${BOOK_ENTER_DURATION}s ease forwards`;
-      }, 400);
-    } else {
-      infoScreenHTML.style.animation = `fadeOut 1s ease forwards`;
-
-      gsap.to(camera.position, {
-        duration: BOOK_ENTER_DURATION,
-        x: targetBook.position.x + bookWorldWidth,
-        y: 1,
-      });
-      gsap.to(
-        targetBook.position,
-        {
-          duration: BOOK_ENTER_DURATION,
-          y: 0,
-        },
-        "<"
-      );
-      gsap.to(
-        targetBook.children[0].rotation,
-        {
-          duration: BOOK_ENTER_DURATION,
-          z: 0,
-          onStart: function () {
-            console.log("DISABLE raycaster");
-            raycaster.layers.disableAll();
-          },
-          onComplete: function () {
-            setTimeout(() => {
-              console.log("ENABLE raycaster");
-              raycaster.layers.enableAll();
-            }, 400);
-          },
-        },
-        "<"
-      );
-      isInfoPageActive = false;
-      // controls.enabled = false;
     }
     //
   }
 });
 
+const backButton = document.getElementById("back-indicator");
+
+backButton.addEventListener("pointerup", () => {
+  console.log("Back button clicked!");
+
+  visibleWidth = 9.11 * (canvas.width / canvas.height);
+  bookWidthPx = canvas.height * 0.45 * 0.5;
+  bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
+
+  showIndicator(clickIndicator);
+  infoScreenHTML.style.animation = `fadeOutReveal 0.5s ease-out forwards`;
+  console.log("DISABLE raycaster");
+  raycaster.layers.disableAll();
+
+  const tl = gsap.timeline({
+    onComplete: function () {
+      isInfoPageActive = false;
+      setTimeout(() => {
+        console.log("ENABLE raycaster");
+        raycaster.layers.enableAll();
+      }, 400);
+    },
+  });
+
+  tl.to(camera.position, {
+    duration: BOOK_ENTER_DURATION,
+    x: targetBook.position.x + bookWorldWidth,
+    y: 1,
+  })
+    .to(
+      targetBook.position,
+      {
+        duration: BOOK_ENTER_DURATION,
+        y: 0,
+      },
+      "<"
+    )
+    .to(
+      targetBook.children[0].rotation,
+      {
+        duration: BOOK_ENTER_DURATION,
+        z: 0,
+      },
+      "<"
+    );
+
+  // controls.enabled = false;
+});
+
 const scrollIndicator = document.getElementById("scroll-indicator");
 const clickIndicator = document.getElementById("click-indicator");
+const backIndicator = document.getElementById("back-indicator");
+
 let idleTimeout;
 
-function showAndHideIndicator(a, b) {
-  a.style.animation = "fadeOut 0.6s ease forwards";
+let currentIndicator = null;
+// let isAnimating = false;
+
+function showIndicator(indicator) {
+  if (currentIndicator === indicator) return;
+  // isAnimating = true;
+  const indicators = [scrollIndicator, clickIndicator, backIndicator];
+  indicators.forEach((i) => {
+    if (i !== indicator) {
+      i.style.animation = "fadeOut 0.6s ease forwards";
+    }
+  });
   setTimeout(() => {
-    a.style.display = "none";
-    b.style.display = "block";
-    b.style.animation = "fadeIn 2s ease forwards";
+    indicators.forEach((i) => {
+      if (i === indicator) {
+        i.style.display = "block";
+        i.style.animation = "fadeIn 2s ease forwards";
+      } else {
+        i.style.display = "none";
+        i.style.animation = "none"; // reset
+      }
+    });
     // setTimeout(() => {
     //   // fadeIn 완료 후 blink 재시작
     //   b.style.animation = "blinkOpacity 3s ease-in-out infinite";
     // }, 2000); // fadeIn duration
-  }, 1000);
+    // isAnimating = false;
+  }, 600);
+  currentIndicator = indicator;
 }
 
 addEventListener("wheel", (event) => {
+  // console.log(isInfoPageActive);
   // console.log(event.deltaX, event.deltaY);
   if (!isInfoPageActive) {
     camera.position.x += event.deltaY * 0.01;
@@ -357,16 +423,29 @@ addEventListener("wheel", (event) => {
         scrollIndicator.style.animation =
           "blinkOpacity 3s ease-in-out infinite";
       }, 2000); // fadeIn duration
-    }, 1000);
+    }, 5000);
   }
-  // if (event.deltaY > 2) {
-  //   indicator.style.opacity = "0";
-  //   indicator.style.transform = "translateY(10px)";
-  // }
-  // } else {
-  //   indicator.style.opacity = "0.8";
-  //   indicator.style.transform = "translateY(0)";
-  // }
+
+  if (targetBook && !isInfoPageActive) {
+    const frustum = new THREE.Frustum();
+    const camMatrix = new THREE.Matrix4();
+    camera.updateMatrixWorld();
+    camMatrix.multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
+    frustum.setFromProjectionMatrix(camMatrix);
+
+    targetBook.traverse(function (child) {
+      if (child.isMesh && child.name === "bookFront") {
+        if (frustum.intersectsObject(child)) {
+          showIndicator(clickIndicator);
+        } else {
+          showIndicator(scrollIndicator);
+        }
+      }
+    });
+  }
 });
 
 const tick = () => {
@@ -395,141 +474,126 @@ const tick = () => {
       document.body.style.cursor = "default";
     }
   } else {
-    // clickIndicator.style.animation = "fadeOut 0.3s ease forwards";
-    // setTimeout(() => {
-    //   clickIndicator.style.display = "none";
     //   scrollIndicator.style.display = "block";
-    //   scrollIndicator.style.animation = "fadeIn 0.3s ease forwards";
-    // }, 300);
   }
 
   if (intersects.length) {
     // console.log("mouse enter");
     let newIndex = objectsToTest.indexOf(intersects[0].object);
-    // scrollIndicator.style.animation = "fadeOut 0.3s ease forwards";
-    // setTimeout(() => {
-    //   scrollIndicator.style.display = "none";
-    //   clickIndicator.style.display = "block";
-    //   clickIndicator.style.animation = "fadeIn 0.3s ease forwards";
-    // }, 350);
 
     if (!currentIntersect && prevIndex !== newIndex) {
+      // New book selected
+      showIndicator(clickIndicator);
+      console.log("DISABLE raycaster");
+      raycaster.layers.disableAll();
       // Target book Front cover animation (transform position and rotation)
       targetBook = intersects[0].object.parent.parent;
-
-      // console.log(targetBook.parent);
-
-      gsap.to(targetBook.position, {
-        duration: BOOK_SHIFT_DURATION,
-        // x: targetBook.position.x + BOOK_TARGET_OFFSET_X,
-        z: BOOK_TARGET_OFFSET_Z,
-        onStart: function () {
-          console.log("DISABLE raycaster");
-          raycaster.layers.disableAll();
-        },
-      });
-      // console.log(targetBook.children[0].position.x);
-      gsap.to(
-        targetBook.children[0].position,
-        {
-          duration: BOOK_SHIFT_DURATION,
-          x: BOOK_EMPTY_X + BOOK_TARGET_OFFSET_X,
-        },
-        "<"
-      );
-
-      gsap.to(
-        targetBook.rotation,
-        {
-          duration: BOOK_SHIFT_DURATION,
-          z: 0,
-          onStart: function () {
-            // Reset last target's transform to original (position and rotation)
-            if (prevIndex !== null) {
-              let lastTargetBook = objectsToTest[prevIndex].parent.parent;
-
-              gsap.to(
-                lastTargetBook.rotation,
-                {
-                  duration: BOOK_SHIFT_DURATION,
-                  z: -Math.PI / 2,
-                },
-                "<"
-              );
-              gsap.to(
-                lastTargetBook.position,
-                {
-                  duration: BOOK_SHIFT_DURATION,
-                  z: 0,
-                },
-                "<"
-              );
-              gsap.to(
-                lastTargetBook.children[0].position,
-                {
-                  duration: BOOK_SHIFT_DURATION,
-                  x: BOOK_EMPTY_X,
-                },
-                "<"
-              );
-            }
-            // Shift books
-            if (prevIndex === null) {
-              // No previous target exists
-              for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
-                gsap.to(objectsToTest[i].parent.parent.position, {
-                  duration: BOOK_SHIFT_DURATION,
-                  x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
-                });
-              }
-            } else {
-              // New target is from left-hand side of last target
-              if (newIndex < prevIndex) {
-                for (let i = newIndex + 1; i < prevIndex + 1; i++) {
-                  gsap.to(objectsToTest[i].parent.parent.position, {
-                    duration: BOOK_SHIFT_DURATION,
-                    x: objectsToTest[i].parent.parent.position.x + BOOK_SHIFT_X,
-                  });
-                }
-              }
-              // New target is from right-hand side of last target
-              if (newIndex > prevIndex) {
-                for (let i = prevIndex + 1; i < newIndex + 1; i++) {
-                  gsap.to(objectsToTest[i].parent.parent.position, {
-                    duration: BOOK_SHIFT_DURATION,
-                    x: objectsToTest[i].parent.parent.position.x - BOOK_SHIFT_X,
-                  });
-                }
-              }
-            }
-            prevIndex = newIndex;
-            // To be deleted (just for unselected book color reset)
-            // for (const object of objectsToTest) {
-            //   if (
-            //     !intersects.find((intersect) => intersect.object === object)
-            //   ) {
-            //     object.material.color.set("#ffffff");
-            //   }
-            // }
-          },
-          onComplete: function () {
+      const lastTargetBook =
+        prevIndex !== null ? objectsToTest[prevIndex].parent.parent : null;
+      const tl = gsap.timeline({
+        onComplete: () => {
+          setTimeout(() => {
             console.log("ENABLE raycaster");
             raycaster.layers.enableAll();
-          },
+          }, 400);
+        },
+      });
+
+      // 이전 타겟 복구
+      if (lastTargetBook) {
+        tl.to(lastTargetBook.rotation, {
+          duration: BOOK_SHIFT_DURATION,
+          z: -Math.PI / 2,
+        })
+          .to(
+            lastTargetBook.position,
+            {
+              duration: BOOK_SHIFT_DURATION,
+              z: 0,
+            },
+            "<"
+          )
+          .to(
+            lastTargetBook.children[0].position,
+            {
+              duration: BOOK_SHIFT_DURATION,
+              x: BOOK_EMPTY_X,
+            },
+            "<"
+          );
+      }
+
+      // 타겟 이동
+      tl.to(
+        targetBook.position,
+        {
+          duration: BOOK_SHIFT_DURATION,
+          z: BOOK_TARGET_OFFSET_Z,
         },
         "<"
-      );
+      )
+        .to(
+          targetBook.children[0].position,
+          {
+            duration: BOOK_SHIFT_DURATION,
+            x: BOOK_EMPTY_X + BOOK_TARGET_OFFSET_X,
+          },
+          "<"
+        )
+        .to(
+          targetBook.rotation,
+          {
+            duration: BOOK_SHIFT_DURATION,
+            z: 0,
+          },
+          "<"
+        );
+
+      // SHIFT BOOKS
+      if (prevIndex === null) {
+        for (let i = newIndex + 1; i < NUM_BOOKS; i++) {
+          const book = objectsToTest[i].parent.parent;
+          tl.to(
+            book.position,
+            {
+              duration: BOOK_SHIFT_DURATION,
+              x: book.position.x + BOOK_SHIFT_X,
+            },
+            "<"
+          );
+        }
+      } else if (newIndex < prevIndex) {
+        for (let i = newIndex + 1; i < prevIndex + 1; i++) {
+          const book = objectsToTest[i].parent.parent;
+          tl.to(
+            book.position,
+            {
+              duration: BOOK_SHIFT_DURATION,
+              x: book.position.x + BOOK_SHIFT_X,
+            },
+            "<"
+          );
+        }
+      } else if (newIndex > prevIndex) {
+        for (let i = prevIndex + 1; i < newIndex + 1; i++) {
+          const book = objectsToTest[i].parent.parent;
+          tl.to(
+            book.position,
+            {
+              duration: BOOK_SHIFT_DURATION,
+              x: book.position.x - BOOK_SHIFT_X,
+            },
+            "<"
+          );
+        }
+      }
+
+      prevIndex = newIndex;
     }
     currentIntersect = intersects[0];
   } else {
     if (currentIntersect) {
       console.log("mouse leave");
-      clickIndicator.style.animation = "fadeOut 0.3s ease forwards";
-      setTimeout(() => {
-        clickIndicator.style.display = "none";
-        scrollIndicator.style.display = "block";
-        scrollIndicator.style.animation = "fadeIn 0.3s ease forwards";
-      }, 300);
     }
     currentIntersect = null;
   }
@@ -543,6 +607,7 @@ const tick = () => {
 
   // Update controls
   // if (isInfoPageActive) controls.update();
+  if (objectControls) objectControls.update();
 
   // Render
   renderer.render(scene, camera);
@@ -558,10 +623,11 @@ window.addEventListener("resize", () => {
   sizes.width = window.innerWidth;
   sizes.height = window.innerHeight;
   // Update camera
+  visibleWidth = 9.11 * (canvas.width / canvas.height);
+  bookWidthPx = canvas.height * 0.45 * 0.5;
+  bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
   if (isInfoPageActive) {
-    const visibleWidth = 9.11 * (canvas.width / canvas.height);
-    const bookWidthPx = canvas.height * 0.45 * 0.5;
-    const bookWorldWidth = (bookWidthPx / canvas.width) * visibleWidth;
+    // if (mobile) camera.position.x = targetBook.position.x + bookWorldWidth;
     camera.position.x =
       targetBook.position.x + bookWorldWidth + visibleWidth / 4;
   }
