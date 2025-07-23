@@ -256,21 +256,9 @@ window.addEventListener("pointerup", () => {
       const axesHelper = new THREE.AxesHelper(10);
       targetBook.children[0].add(axesHelper);
 
-      targetBook.children[0].rotation.order = "YXZ";
-      objectControls = new ObjectControls({
-        object: targetBook.children[0], // 예: targetBook
-        camera,
-        domElement: renderer.domElement,
-        enableXRotation: true,
-        enableYRotation: false,
-        // dampingFactor={0.1}
-        // maxRotationX: 0,
-        // minRotationX: 0,
-        // enableXRotation={true}
-        // enableYRotation={true}
-      });
+      // targetBook.children[0].rotation.order = "YXZ";
 
-      console.log(targetBook.children[0].rotation);
+      // console.log(targetBook.children[0].rotation);
       showIndicator(backIndicator);
       setTimeout(() => {
         infoScreenHTML.style.animation = `fadeInReveal 1s ease-out forwards`;
@@ -281,7 +269,20 @@ window.addEventListener("pointerup", () => {
       // enter Book Detail Page
       // 모바일 일 시 :         x: targetBook.position.x + bookWorldWidth
 
-      const tl = gsap.timeline();
+      const tl = gsap.timeline({
+        onComplete: () => {
+          targetBook.children[0].rotation.z = 0;
+          objectControls = new ObjectControls({
+            object: targetBook.children[0],
+            camera,
+            domElement: renderer.domElement,
+            enableXRotation: false,
+            enableYRotation: false,
+            // maxRotationX: Math.PI / 6,
+            // minRotationX: -Math.PI / 6,
+          });
+        },
+      });
 
       tl.to(camera.position, {
         duration: BOOK_ENTER_DURATION,
@@ -328,6 +329,11 @@ backButton.addEventListener("pointerup", () => {
   raycaster.layers.disableAll();
 
   const tl = gsap.timeline({
+    onStart: () => {
+      objectControls = null;
+      targetBook.children[0].rotation.z =
+        targetBook.children[0].rotation.z % (Math.PI * 2);
+    },
     onComplete: function () {
       isInfoPageActive = false;
       setTimeout(() => {

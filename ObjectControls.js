@@ -8,10 +8,6 @@ export class ObjectControls {
     domElement,
     orbitControl = null,
     dampingFactor = 0.1,
-    maxRotationX = Math.PI / 2,
-    minRotationX = -Math.PI / 2,
-    enableXRotation = true,
-    enableYRotation = true,
   }) {
     this.object = object;
     this.camera = camera;
@@ -19,10 +15,6 @@ export class ObjectControls {
     this.orbitControl = orbitControl;
 
     this.dampingFactor = dampingFactor;
-    this.maxRotationX = maxRotationX;
-    this.minRotationX = minRotationX;
-    this.enableXRotation = enableXRotation;
-    this.enableYRotation = enableYRotation;
 
     this.isRotating = false;
     this.initialTouch = { x: 0, y: 0 };
@@ -60,16 +52,17 @@ export class ObjectControls {
     if (!this.isRotating) return;
 
     const dx = x - this.initialTouch.x;
-    const dy = y - this.initialTouch.y;
+    // const dy = y - this.initialTouch.y;
 
-    const newX = this.enableXRotation
-      ? this.startRotation.x + dy * 0.01
-      : this.object.rotation.x;
-    const newY = this.enableYRotation
-      ? this.startRotation.y + dx * 0.01
-      : this.object.rotation.y;
+    // const newX = this.enableXRotation
+    //   ? this.startRotation.x + dy * 0.01
+    //   : this.object.rotation.x;
+    // const newY = this.enableYRotation
+    //   ? this.startRotation.y + dx * 0.01
+    //   : this.object.rotation.y;
+    const newZ = this.startRotation.z - dx * 0.01;
 
-    this.targetRotation.set(newX, newY, 0);
+    this.targetRotation.set(0, 0, newZ);
   }
 
   handleEnd() {
@@ -84,18 +77,19 @@ export class ObjectControls {
     const current = this.object.rotation;
     const target = this.targetRotation;
 
-    const clampedX = THREE.MathUtils.clamp(
-      target.x,
-      this.minRotationX,
-      this.maxRotationX
-    );
+    // const clampedX = THREE.MathUtils.clamp(
+    //   target.x,
+    //   this.minRotationX,
+    //   this.maxRotationX
+    // );
 
-    if (this.enableXRotation) {
-      current.x = THREE.MathUtils.lerp(current.x, clampedX, this.dampingFactor);
-    }
-    if (this.enableYRotation) {
-      current.y = THREE.MathUtils.lerp(current.y, target.y, this.dampingFactor);
-    }
+    // if (this.enableXRotation) {
+    //   current.x = THREE.MathUtils.lerp(current.x, clampedX, this.dampingFactor);
+    // }
+    // if (this.enableYRotation) {
+    //   current.y = THREE.MathUtils.lerp(current.y, target.y, this.dampingFactor);
+    // }
+    current.z = THREE.MathUtils.lerp(current.z, target.z, this.dampingFactor);
   }
 
   addListeners() {
