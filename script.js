@@ -8,6 +8,24 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { ObjectControls } from "./ObjectControls.js";
+// import { getPenguin } from "./PenguinAPI.js";
+
+let isbn = "9780241739822";
+
+const getInfo2 = async () => {
+  let localJsonStatus = "";
+  const res = await fetch(
+    `https://api.penguinrandomhouse.com/resources/v2/title/domains/PRH.US/titles/${isbn}?api_key=qyv6q7cvn9sgyyv2zeh94bhj`
+  );
+  // cover img - https://images.penguinrandomhouse.com/cover/9780241739822
+  const resJson = await res.json();
+  // console.log(resJson.data.titles[0]);
+  resJson.data.titles.map((e) => console.log(e)); //for each
+};
+console.log(getInfo2());
+
+// const { resJson, localJsonStatus } = await getPenguin();
+// console.log(localJsonStatus, resJson);
 
 //GUI and Stats
 const gui = new GUI();
